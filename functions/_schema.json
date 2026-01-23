@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Function Definition Schema",
+  "description": "定义 function-skill 的 JSON schema",
+  "type": "object",
+  "required": ["name", "task"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "function 的唯一名称",
+      "pattern": "^[a-z_][a-z0-9_]*$"
+    },
+    "description": {
+      "type": "string",
+      "description": "function 的描述"
+    },
+    "task": {
+      "type": "string",
+      "description": "当前任务的提示词，告诉 Claude 要做什么"
+    },
+    "input_hint": {
+      "type": "string",
+      "description": "输入参数的说明（提示词形式）"
+    },
+    "output_hint": {
+      "type": "string", 
+      "description": "输出结果的说明（提示词形式）"
+    },
+    "on_complete": {
+      "type": "object",
+      "description": "任务完成后的行为",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["return", "call", "switch"],
+          "description": "完成类型：return=返回结果, call=调用下一个function, switch=条件分支"
+        },
+        "target": {
+          "type": "string",
+          "description": "下一个要调用的 function 名称（当 type=call 时必填）"
+        },
+        "pass_output": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否将当前输出作为下一个 function 的输入"
+        },
+        "conditions": {
+          "type": "array",
+          "description": "条件分支（当 type=switch 时使用）",
+          "items": {
+            "type": "object",
+            "required": ["when", "call"],
+            "properties": {
+              "when": {
+                "type": "string",
+                "description": "条件描述（自然语言）"
+              },
+              "call": {
+                "type": "string",
+                "description": "满足条件时调用的 function"
+              }
+            }
+          }
+        },
+        "default": {
+          "type": "string",
+          "description": "switch 的默认分支（无条件匹配时调用）"
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "此 function 可使用的工具列表（渐进式暴露）"
+    },
+    "max_iterations": {
+      "type": "integer",
+      "default": 10,
+      "description": "最大迭代次数（防止无限循环）"
+    }
+  }
+}

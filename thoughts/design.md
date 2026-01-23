@@ -135,7 +135,7 @@ function 也有名字，也有匿名 Function，以便被其它 function 调用�
   1. 驱动下个步骤
   2. 驱动 function 调用
   3. 甚至可以用 claude code 的无头模式驱动下一个任务 `cat "下个任务" | claude -p`
-3. 遵循渐进式暴露原则
+3. **遵循渐进式暴露原则**，每次只暴露一个 function, 即执行函数栈仅有一个函数栈顶。
 
 
 能力展示：

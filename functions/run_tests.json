@@ -1,0 +1,19 @@
+{
+  "name": "run_tests",
+  "description": "运行测试验证修复结果",
+  "input_hint": "需要测试的范围",
+  "output_hint": "测试结果",
+  "task": "运行项目测试：\n\n1. 检测项目的测试框架\n2. 运行相关测试\n3. 分析测试结果\n\n输出：\n- 测试通过/失败状态\n- 失败测试的详情（如有）",
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "测试失败",
+        "call": "fix_issues"
+      }
+    ],
+    "default": "_return"
+  },
+  "tools": ["Bash", "Read"],
+  "max_iterations": 3
+}

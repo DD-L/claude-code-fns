@@ -1,0 +1,30 @@
+{
+  "name": "task_orchestrator",
+  "description": "智能任务编排器 - 分析输入并路由到合适的 function",
+  "input_hint": "用户的任务描述",
+  "output_hint": "任务类型和路由决策",
+  "task": "分析用户输入的任务描述，确定应该调用哪个 function：\n\n1. 理解用户意图\n2. 检查 functions/ 目录中可用的 function\n3. 选择最合适的 function\n4. 准备传递给该 function 的参数\n\n分析结果格式：\n- task_type: 任务类型\n- selected_function: 选择的 function\n- prepared_input: 准备好的输入参数",
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "任务涉及代码审查 (task_type = 'review')",
+        "call": "code_review"
+      },
+      {
+        "when": "任务涉及代码修复 (task_type = 'fix')",
+        "call": "fix_issues"
+      },
+      {
+        "when": "任务涉及测试 (task_type = 'test')",
+        "call": "run_tests"
+      },
+      {
+        "when": "上下文过长需要压缩 (task_type = 'compact')",
+        "call": "_compact"
+      }
+    ],
+    "default": "_return"
+  },
+  "tools": ["Read", "Glob"]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "description": "Test project for function testing",
+  "scripts": {
+    "test": "node test_sample.js"
+  },
+  "devDependencies": {}
+}

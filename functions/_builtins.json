@@ -1,0 +1,20 @@
+{
+  "_comment": "内置 function 定义，这些 function 直接映射到 Claude Code 指令",
+  "builtins": {
+    "_compact": {
+      "description": "执行上下文压缩",
+      "action": "/compact",
+      "note": "对应 Claude Code 的上下文压缩功能"
+    },
+    "_clear": {
+      "description": "清理上下文",
+      "action": "/clear",
+      "note": "对应 Claude Code 的上下文清理功能"
+    },
+    "_return": {
+      "description": "结束当前 function 调用链，返回结果",
+      "action": "terminate",
+      "note": "标记当前 function 执行完成"
+    }
+  }
+}

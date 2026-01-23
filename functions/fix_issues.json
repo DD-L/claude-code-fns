@@ -1,0 +1,18 @@
+{
+  "name": "fix_issues",
+  "description": "修复代码审查中发现的问题",
+  "input_hint": "来自 code_review 的问题列表",
+  "output_hint": "修复结果总结",
+  "task": "根据输入的问题列表，修复代码中的问题：\n\n1. 逐个处理问题列表中的问题\n2. 对每个问题：\n   - 定位问题代码\n   - 实施修复\n   - 验证修复有效\n3. 输出修复总结\n\n修复完成后，输出：\n- 已修复问题数\n- 各问题的修复方式\n- 是否需要运行测试验证",
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "修复涉及核心逻辑，需要运行测试",
+        "call": "run_tests"
+      }
+    ],
+    "default": "_return"
+  },
+  "tools": ["Read", "Write", "Edit", "Grep"]
+}
