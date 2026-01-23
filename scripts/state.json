@@ -1,8 +1,7 @@
 {
-  "current_chain": null,
-  "current_function": null,
-  "pending_functions": [],
-  "completed_functions": [],
   "status": "idle",
+  "current_function": null,
+  "input": null,
+  "completed_functions": [],
   "last_update": null
 }
