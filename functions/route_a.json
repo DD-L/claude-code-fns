@@ -1,0 +1,32 @@
+{
+  "name": "route_a",
+  "description": "动态路由函数 A - 根据 n 的值选择不同路径",
+  "params": ["n"],
+  "task": "使用 echo 输出: [A] n=$n, path=$(($n % 3))",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$n <= 0",
+        "call": "_return"
+      },
+      {
+        "when": "$n % 3 == 0",
+        "tail_call": "route_b",
+        "args": {"n": "$n - 1", "from": "A"}
+      },
+      {
+        "when": "$n % 3 == 1",
+        "tail_call": "route_c",
+        "args": {"n": "$n - 1", "from": "A"}
+      },
+      {
+        "when": "$n % 3 == 2",
+        "tail_call": "route_a",
+        "args": {"n": "$n - 2"}
+      }
+    ],
+    "default": "_return"
+  }
+}

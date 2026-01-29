@@ -1,0 +1,16 @@
+{
+  "name": "retry",
+  "description": "示例：重试机制 - 最多尝试 N 次",
+  "params": ["task_name", "attempt", "max_attempts"],
+  "task": "Bash(echo \"[retry] 尝试 $attempt/$max_attempts: $task_name\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "loop",
+    "while": "$attempt < $max_attempts",
+    "do": {
+      "tail_call": "retry",
+      "args": {"task_name": "$task_name", "attempt": "$attempt + 1", "max_attempts": "$max_attempts"}
+    },
+    "max_iterations": 10
+  }
+}

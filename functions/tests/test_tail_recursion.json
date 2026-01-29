@@ -1,0 +1,23 @@
+{
+  "name": "test_tail_recursion",
+  "description": "测试尾递归 - 使用 tail_call，栈深度恒为 1",
+  "params": ["n"],
+  "task": "Bash(echo \"[test_tail_recursion] n=$n\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$n <= 0",
+        "type": "return",
+        "output": "done"
+      },
+      {
+        "when": "$n > 0",
+        "tail_call": "test_tail_recursion",
+        "args": {"n": "$n - 1"}
+      }
+    ],
+    "default": "_return"
+  }
+}

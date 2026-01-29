@@ -1,0 +1,23 @@
+{
+  "name": "test_recursion",
+  "description": "测试递归 - 使用 call 实现真正的递归，栈深度增长",
+  "params": ["n"],
+  "task": "Bash(echo \"[test_recursion] n=$n, entering...\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$n <= 0",
+        "type": "return",
+        "output": "base_case"
+      },
+      {
+        "when": "$n > 0",
+        "call": "test_recursion",
+        "args": {"n": "$n - 1"}
+      }
+    ],
+    "default": "_return"
+  }
+}

@@ -1,0 +1,413 @@
+{
+  "_generated": "2026-01-28T17:15:40.334893",
+  "_version": "1.0",
+  "functions": {
+    "code_review": {
+      "path": "code_review.json",
+      "fqn": "code_review",
+      "name": "code_review",
+      "description": "审查代码质量、安全性和性能问题",
+      "params": [
+        "target",
+        "review_type"
+      ],
+      "calls": [
+        "fix_issues"
+      ]
+    },
+    "fix_issues": {
+      "path": "fix_issues.json",
+      "fqn": "fix_issues",
+      "name": "fix_issues",
+      "description": "修复代码审查中发现的问题",
+      "params": [
+        "target",
+        "issues"
+      ],
+      "calls": [
+        "run_tests"
+      ]
+    },
+    "grow": {
+      "path": "grow.json",
+      "fqn": "grow",
+      "name": "grow",
+      "description": "演示栈增长 - 使用 call（非 tail_call），栈深度随调用增加",
+      "params": [
+        "n"
+      ],
+      "calls": [
+        "grow"
+      ]
+    },
+    "long_task": {
+      "path": "long_task.json",
+      "fqn": "long_task",
+      "name": "long_task",
+      "description": "长任务测试 - 50 次迭代，测试 stop-hook 机制",
+      "params": [
+        "n",
+        "total"
+      ],
+      "calls": [
+        "long_task"
+      ]
+    },
+    "route_a": {
+      "path": "route_a.json",
+      "fqn": "route_a",
+      "name": "route_a",
+      "description": "动态路由函数 A - 根据 n 的值选择不同路径",
+      "params": [
+        "n"
+      ],
+      "calls": [
+        "route_c",
+        "route_a",
+        "route_b"
+      ]
+    },
+    "route_b": {
+      "path": "route_b.json",
+      "fqn": "route_b",
+      "name": "route_b",
+      "description": "动态路由函数 B - 偶数走 A，奇数走 C",
+      "params": [
+        "n",
+        "from"
+      ],
+      "calls": [
+        "route_c",
+        "route_a"
+      ]
+    },
+    "route_c": {
+      "path": "route_c.json",
+      "fqn": "route_c",
+      "name": "route_c",
+      "description": "动态路由函数 C - 根据 n 和 from 决定路径",
+      "params": [
+        "n",
+        "from"
+      ],
+      "calls": [
+        "route_a",
+        "route_b"
+      ]
+    },
+    "run_tests": {
+      "path": "run_tests.json",
+      "fqn": "run_tests",
+      "name": "run_tests",
+      "description": "运行测试验证修复结果",
+      "params": [
+        "target"
+      ],
+      "calls": [
+        "fix_issues"
+      ]
+    },
+    "task_orchestrator": {
+      "path": "task_orchestrator.json",
+      "fqn": "task_orchestrator",
+      "name": "task_orchestrator",
+      "description": "智能任务编排器 - 分析输入并路由到合适的 function",
+      "params": [],
+      "calls": [
+        "run_tests",
+        "_compact",
+        "fix_issues",
+        "code_review"
+      ]
+    },
+    "examples/batch_process": {
+      "path": "examples/batch_process.json",
+      "fqn": "examples/batch_process",
+      "name": "batch_process",
+      "description": "示例：循环执行 - 批量处理",
+      "params": [
+        "items",
+        "index"
+      ],
+      "calls": [
+        "batch_process"
+      ]
+    },
+    "examples/pipeline": {
+      "path": "examples/pipeline.json",
+      "fqn": "examples/pipeline",
+      "name": "pipeline",
+      "description": "示例：序列执行 - 数据处理管道",
+      "params": [
+        "data"
+      ],
+      "calls": [
+        "transform",
+        "validate",
+        "save"
+      ]
+    },
+    "examples/retry": {
+      "path": "examples/retry.json",
+      "fqn": "examples/retry",
+      "name": "retry",
+      "description": "示例：重试机制 - 最多尝试 N 次",
+      "params": [
+        "task_name",
+        "attempt",
+        "max_attempts"
+      ],
+      "calls": [
+        "retry"
+      ]
+    },
+    "examples/save": {
+      "path": "examples/save.json",
+      "fqn": "examples/save",
+      "name": "save",
+      "description": "保存数据",
+      "params": [
+        "input"
+      ],
+      "calls": []
+    },
+    "examples/transform": {
+      "path": "examples/transform.json",
+      "fqn": "examples/transform",
+      "name": "transform",
+      "description": "转换数据",
+      "params": [
+        "input"
+      ],
+      "calls": []
+    },
+    "examples/validate": {
+      "path": "examples/validate.json",
+      "fqn": "examples/validate",
+      "name": "validate",
+      "description": "验证数据",
+      "params": [
+        "input"
+      ],
+      "calls": []
+    },
+    "tests/branch_handler_a": {
+      "path": "tests/branch_handler_a.json",
+      "fqn": "tests/branch_handler_a",
+      "name": "branch_handler_a",
+      "description": "分支A处理器 - 使用 call 调用，会返回",
+      "params": [
+        "from"
+      ],
+      "calls": []
+    },
+    "tests/branch_handler_b": {
+      "path": "tests/branch_handler_b.json",
+      "fqn": "tests/branch_handler_b",
+      "name": "branch_handler_b",
+      "description": "分支B处理器 - 使用 tail_call 调用，不返回",
+      "params": [
+        "from"
+      ],
+      "calls": []
+    },
+    "tests/seq_step1": {
+      "path": "tests/seq_step1.json",
+      "fqn": "tests/seq_step1",
+      "name": "seq_step1",
+      "description": "序列步骤1 - 添加前缀",
+      "params": [
+        "data"
+      ],
+      "calls": []
+    },
+    "tests/seq_step2": {
+      "path": "tests/seq_step2.json",
+      "fqn": "tests/seq_step2",
+      "name": "seq_step2",
+      "description": "序列步骤2 - 添加中缀",
+      "params": [
+        "data"
+      ],
+      "calls": []
+    },
+    "tests/seq_step3": {
+      "path": "tests/seq_step3.json",
+      "fqn": "tests/seq_step3",
+      "name": "seq_step3",
+      "description": "序列步骤3 - 最终处理",
+      "params": [
+        "data"
+      ],
+      "calls": []
+    },
+    "tests/test_branch": {
+      "path": "tests/test_branch.json",
+      "fqn": "tests/test_branch",
+      "name": "test_branch",
+      "description": "测试分支(switch) - 根据 mode 选择不同路径",
+      "params": [
+        "mode"
+      ],
+      "calls": [
+        "branch_handler_b",
+        "branch_handler_a"
+      ]
+    },
+    "tests/test_combined": {
+      "path": "tests/test_combined.json",
+      "fqn": "tests/test_combined",
+      "name": "test_combined",
+      "description": "综合测试 - 结合分支、序列、循环的复杂场景",
+      "params": [
+        "mode",
+        "count"
+      ],
+      "calls": [
+        "test_recursion",
+        "test_loop",
+        "test_tail_recursion",
+        "test_sequence"
+      ]
+    },
+    "tests/test_loop": {
+      "path": "tests/test_loop.json",
+      "fqn": "tests/test_loop",
+      "name": "test_loop",
+      "description": "测试循环(loop) - 迭代直到条件不满足",
+      "params": [
+        "count",
+        "max"
+      ],
+      "calls": [
+        "test_loop"
+      ]
+    },
+    "tests/test_recursion": {
+      "path": "tests/test_recursion.json",
+      "fqn": "tests/test_recursion",
+      "name": "test_recursion",
+      "description": "测试递归 - 使用 call 实现真正的递归，栈深度增长",
+      "params": [
+        "n"
+      ],
+      "calls": [
+        "test_recursion"
+      ]
+    },
+    "tests/test_sequence": {
+      "path": "tests/test_sequence.json",
+      "fqn": "tests/test_sequence",
+      "name": "test_sequence",
+      "description": "测试序列(sequence) - 三步管道，验证 $prev 传递",
+      "params": [
+        "input"
+      ],
+      "calls": [
+        "seq_step1",
+        "seq_step3",
+        "seq_step2"
+      ]
+    },
+    "tests/test_tail_recursion": {
+      "path": "tests/test_tail_recursion.json",
+      "fqn": "tests/test_tail_recursion",
+      "name": "test_tail_recursion",
+      "description": "测试尾递归 - 使用 tail_call，栈深度恒为 1",
+      "params": [
+        "n"
+      ],
+      "calls": [
+        "test_tail_recursion"
+      ]
+    }
+  },
+  "by_short_name": {
+    "code_review": [
+      "code_review"
+    ],
+    "fix_issues": [
+      "fix_issues"
+    ],
+    "grow": [
+      "grow"
+    ],
+    "long_task": [
+      "long_task"
+    ],
+    "route_a": [
+      "route_a"
+    ],
+    "route_b": [
+      "route_b"
+    ],
+    "route_c": [
+      "route_c"
+    ],
+    "run_tests": [
+      "run_tests"
+    ],
+    "task_orchestrator": [
+      "task_orchestrator"
+    ],
+    "batch_process": [
+      "examples/batch_process"
+    ],
+    "pipeline": [
+      "examples/pipeline"
+    ],
+    "retry": [
+      "examples/retry"
+    ],
+    "save": [
+      "examples/save"
+    ],
+    "transform": [
+      "examples/transform"
+    ],
+    "validate": [
+      "examples/validate"
+    ],
+    "branch_handler_a": [
+      "tests/branch_handler_a"
+    ],
+    "branch_handler_b": [
+      "tests/branch_handler_b"
+    ],
+    "seq_step1": [
+      "tests/seq_step1"
+    ],
+    "seq_step2": [
+      "tests/seq_step2"
+    ],
+    "seq_step3": [
+      "tests/seq_step3"
+    ],
+    "test_branch": [
+      "tests/test_branch"
+    ],
+    "test_combined": [
+      "tests/test_combined"
+    ],
+    "test_loop": [
+      "tests/test_loop"
+    ],
+    "test_recursion": [
+      "tests/test_recursion"
+    ],
+    "test_sequence": [
+      "tests/test_sequence"
+    ],
+    "test_tail_recursion": [
+      "tests/test_tail_recursion"
+    ]
+  },
+  "stats": {
+    "total_functions": 26,
+    "namespaces": [
+      "examples",
+      "tests"
+    ],
+    "conflicts": {}
+  }
+}

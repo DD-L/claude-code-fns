@@ -4,79 +4,116 @@
   "description": "定义 function-skill 的 JSON schema",
   "type": "object",
   "required": ["name", "task"],
+  "definitions": {
+    "function_ref": {
+      "type": "string",
+      "description": "函数引用，支持多种语法",
+      "examples": [
+        "validate",
+        "examples/validate",
+        "./validate",
+        "../route_a",
+        "_return",
+        "_compact"
+      ],
+      "pattern": "^(_[a-z]+|[.]{1,2}/)?[a-zA-Z0-9_/]+$"
+    }
+  },
   "properties": {
     "name": {
       "type": "string",
-      "description": "function 的唯一名称",
-      "pattern": "^[a-z_][a-z0-9_]*$"
+      "description": "function 的短名（不含命名空间）"
     },
     "description": {
       "type": "string",
       "description": "function 的描述"
     },
+    "params": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "参数名列表"
+    },
     "task": {
       "type": "string",
-      "description": "当前任务的提示词，告诉 Claude 要做什么"
-    },
-    "input_hint": {
-      "type": "string",
-      "description": "输入参数的说明（提示词形式）"
-    },
-    "output_hint": {
-      "type": "string", 
-      "description": "输出结果的说明（提示词形式）"
-    },
-    "on_complete": {
-      "type": "object",
-      "description": "任务完成后的行为",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["return", "call", "switch"],
-          "description": "完成类型：return=返回结果, call=调用下一个function, switch=条件分支"
-        },
-        "target": {
-          "type": "string",
-          "description": "下一个要调用的 function 名称（当 type=call 时必填）"
-        },
-        "pass_output": {
-          "type": "boolean",
-          "default": true,
-          "description": "是否将当前输出作为下一个 function 的输入"
-        },
-        "conditions": {
-          "type": "array",
-          "description": "条件分支（当 type=switch 时使用）",
-          "items": {
-            "type": "object",
-            "required": ["when", "call"],
-            "properties": {
-              "when": {
-                "type": "string",
-                "description": "条件描述（自然语言）"
-              },
-              "call": {
-                "type": "string",
-                "description": "满足条件时调用的 function"
-              }
-            }
-          }
-        },
-        "default": {
-          "type": "string",
-          "description": "switch 的默认分支（无条件匹配时调用）"
-        }
-      }
+      "description": "任务提示词，可使用 $param_name 引用参数"
     },
     "tools": {
       "type": "array",
       "items": {"type": "string"},
-      "description": "此 function 可使用的工具列表（渐进式暴露）"
+      "description": "可使用的工具列表（渐进式暴露）"
     },
-    "max_iterations": {
-      "type": "integer",
-      "default": 10,
-      "description": "最大迭代次数（防止无限循环）"
+    "on_complete": {
+      "type": "object",
+      "description": "完成后的行为",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["return", "call", "tail_call", "switch", "sequence", "loop"],
+          "description": "动作类型"
+        },
+        "target": {
+          "$ref": "#/definitions/function_ref",
+          "description": "目标函数引用（call/tail_call 使用），支持: 短名、绝对路径(ns/name)、相对路径(./name, ../name)"
+        },
+        "args": {
+          "type": "object",
+          "description": "传递给目标的参数"
+        },
+        "conditions": {
+          "type": "array",
+          "description": "条件分支列表（switch 使用）",
+          "items": {
+            "type": "object",
+            "properties": {
+              "when": {"type": "string", "description": "条件表达式"},
+              "type": {"type": "string", "enum": ["return"]},
+              "call": {"$ref": "#/definitions/function_ref"},
+              "tail_call": {"$ref": "#/definitions/function_ref"},
+              "args": {"type": "object"}
+            },
+            "required": ["when"]
+          }
+        },
+        "default": {
+          "$ref": "#/definitions/function_ref",
+          "description": "默认动作: _return 或函数引用"
+        },
+        "default_args": {
+          "type": "object",
+          "description": "默认动作的参数"
+        },
+        "steps": {
+          "type": "array",
+          "description": "序列步骤（sequence 使用）",
+          "items": {
+            "type": "object",
+            "properties": {
+              "call": {"$ref": "#/definitions/function_ref"},
+              "tail_call": {"$ref": "#/definitions/function_ref"},
+              "args": {"type": "object"}
+            }
+          }
+        },
+        "while": {
+          "type": "string",
+          "description": "循环条件（loop 使用）"
+        },
+        "do": {
+          "type": "object",
+          "description": "循环体（loop 使用，只能用 tail_call）",
+          "properties": {
+            "tail_call": {"$ref": "#/definitions/function_ref"},
+            "args": {"type": "object"}
+          },
+          "required": ["tail_call"],
+          "additionalProperties": false
+        },
+        "max_iterations": {
+          "type": "number",
+          "description": "最大循环次数",
+          "default": 1000
+        }
+      }
     }
   }
 }

@@ -1,19 +1,22 @@
 {
   "name": "run_tests",
   "description": "运行测试验证修复结果",
-  "input_hint": "需要测试的范围",
-  "output_hint": "测试结果",
-  "task": "运行项目测试：\n\n1. 检测项目的测试框架\n2. 运行相关测试\n3. 分析测试结果\n\n输出：\n- 测试通过/失败状态\n- 失败测试的详情（如有）",
+  "params": ["target"],
+  "task": "运行 $target 相关的测试：\n1. 检测测试框架\n2. 运行测试\n3. 分析结果\n\n设置 test_passed = true/false",
+  "tools": ["Bash", "Read"],
   "on_complete": {
     "type": "switch",
     "conditions": [
       {
-        "when": "测试失败",
-        "call": "fix_issues"
+        "when": "test_passed == false",
+        "call": "fix_issues",
+        "args": {"target": "$target", "issues": "$failures"}
+      },
+      {
+        "when": "test_passed == true",
+        "type": "return"
       }
     ],
     "default": "_return"
-  },
-  "tools": ["Bash", "Read"],
-  "max_iterations": 3
+  }
 }

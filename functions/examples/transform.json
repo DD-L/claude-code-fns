@@ -1,0 +1,8 @@
+{
+  "name": "transform",
+  "description": "转换数据",
+  "params": ["input"],
+  "task": "Bash(echo \"[transform] 转换: $input → transformed\")",
+  "tools": ["Bash"],
+  "on_complete": {"type": "return"}
+}

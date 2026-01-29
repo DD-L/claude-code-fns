@@ -4,10 +4,11 @@
 
 .DESCRIPTION
     这个脚本通过循环调用 Claude Code 的 headless 模式来确保 function 调用链完整执行。
-    它会监控 state.json 文件，在调用链未完成时自动发送继续命令。
+    它会监控会话状态文件，在调用链未完成时自动发送继续命令。
 
 .EXAMPLE
     .\scripts\run_chain.ps1 -Function code_review -Input "test_data/sample_code.py security"
+    .\scripts\run_chain.ps1 -Function code_review -Input "file.py" -Session test1
 #>
 
 param(
@@ -15,10 +16,13 @@ param(
     [string]$Function,
     
     [Parameter(Mandatory=$false)]
-    [string]$Input = ""
+    [string]$Input = "",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$Session = "default"
 )
 
-$StateFile = "scripts/state.json"
+$StateFile = "scripts/states/$Session.json"
 $MaxIterations = 20
 
 function Get-State {
@@ -33,16 +37,13 @@ function Get-State {
 }
 
 function Reset-State {
-    @{
-        status = "idle"
-        current_function = $null
-        completed_functions = @()
-        last_update = (Get-Date).ToString("o")
-    } | ConvertTo-Json | Set-Content $StateFile
+    $dir = Split-Path $StateFile -Parent
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    @{ status = "idle"; stack = @(); output = $null } | ConvertTo-Json | Set-Content $StateFile
 }
 
 # 初始化
-Write-Host "🚀 启动 function 调用链: $Function" -ForegroundColor Cyan
+Write-Host "🚀 启动 function 调用链: $Function (session: $Session)" -ForegroundColor Cyan
 Write-Host "📝 输入: $Input" -ForegroundColor Gray
 Write-Host ("=" * 50)
 
@@ -50,7 +51,7 @@ Write-Host ("=" * 50)
 Reset-State
 
 # 初始命令
-$prompt = "/fn $Function $Input"
+$prompt = "/fn $Function $Input --session=$Session"
 
 for ($i = 1; $i -le $MaxIterations; $i++) {
     Write-Host "`n--- 迭代 $i ---" -ForegroundColor Yellow
@@ -76,22 +77,22 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
         break
     }
     
-    if ($state.status -eq "completed") {
+    if ($state.status -eq "idle" -and $state.stack.Count -eq 0) {
         Write-Host ("=" * 50)
         Write-Host "✅ 调用链完成" -ForegroundColor Green
-        if ($state.completed_functions) {
-            Write-Host "执行路径: $($state.completed_functions -join ' → ')" -ForegroundColor Gray
+        if ($state.output) {
+            Write-Host "输出: $($state.output)" -ForegroundColor Gray
         }
         break
     }
-    elseif ($state.status -eq "running" -and $state.current_function) {
-        # 继续执行
-        $prompt = "继续执行 function 调用链，当前: $($state.current_function)"
-        Write-Host "🔄 继续: $($state.current_function)" -ForegroundColor Cyan
+    elseif ($state.status -eq "running" -and $state.stack.Count -gt 0) {
+        $topFn = $state.stack[-1].function
+        $prompt = "/fn_continue --session=$Session"
+        Write-Host "🔄 继续: $topFn (depth: $($state.stack.Count))" -ForegroundColor Cyan
     }
     else {
         Write-Host "⚠️ 状态异常，停止执行" -ForegroundColor Yellow
-        Write-Host "状态: $($state | ConvertTo-Json)" -ForegroundColor Gray
+        Write-Host "状态: $($state | ConvertTo-Json -Compress)" -ForegroundColor Gray
         break
     }
     

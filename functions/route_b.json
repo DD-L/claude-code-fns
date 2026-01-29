@@ -1,0 +1,27 @@
+{
+  "name": "route_b",
+  "description": "动态路由函数 B - 偶数走 A，奇数走 C",
+  "params": ["n", "from"],
+  "task": "使用 echo 输出: [B] n=$n, from=$from, next=$( if (($n % 2 == 0)); then echo A; else echo C; fi )",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$n <= 0",
+        "call": "_return"
+      },
+      {
+        "when": "$n % 2 == 0",
+        "tail_call": "route_a",
+        "args": {"n": "$n - 1"}
+      },
+      {
+        "when": "$n % 2 == 1",
+        "tail_call": "route_c",
+        "args": {"n": "$n - 1", "from": "B"}
+      }
+    ],
+    "default": "_return"
+  }
+}

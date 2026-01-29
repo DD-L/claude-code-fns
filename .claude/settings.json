@@ -1,15 +1,5 @@
 {
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File scripts/check_chain.ps1"
-          }
-        ]
-      }
-    ]
+  "permissions": {
+    "allow": []
   }
 }

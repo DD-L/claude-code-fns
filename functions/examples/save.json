@@ -1,0 +1,8 @@
+{
+  "name": "save",
+  "description": "保存数据",
+  "params": ["input"],
+  "task": "Bash(echo \"[save] 保存: $input → done\")",
+  "tools": ["Bash"],
+  "on_complete": {"type": "return"}
+}

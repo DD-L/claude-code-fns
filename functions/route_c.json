@@ -1,0 +1,28 @@
+{
+  "name": "route_c",
+  "description": "动态路由函数 C - 根据 n 和 from 决定路径",
+  "params": ["n", "from"],
+  "task": "使用 echo 输出: [C] n=$n, from=$from",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$n <= 0",
+        "call": "_return"
+      },
+      {
+        "when": "$from == 'A'",
+        "tail_call": "route_b",
+        "args": {"n": "$n - 1", "from": "C"}
+      },
+      {
+        "when": "$from == 'B'",
+        "tail_call": "route_a",
+        "args": {"n": "$n - 2"}
+      }
+    ],
+    "default": "route_a",
+    "default_args": {"n": "$n - 1"}
+  }
+}

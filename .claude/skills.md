@@ -1,82 +1,84 @@
 # Meta Function Skill
 
-一个"元技能"框架，用于定义和执行可组合的 function-skill。
-
-## 概念
-
-**Function** 是可复用的任务单元：
-- 有输入和输出（提示词文本）
-- 可以调用其它 function
-- 通过 JSON 配置定义
+执行 `functions/` 目录中的 JSON 定义的 function。
 
 ## Function 定义
 
-在 `functions/` 目录下创建 JSON 文件：
-
 ```json
 {
-  "name": "my_function",
-  "task": "任务描述提示词",
+  "name": "my_fn",
+  "params": ["arg1", "arg2"],
+  "task": "任务描述，使用 $arg1 $arg2 引用参数",
+  "tools": ["Bash", "Read"],
   "on_complete": {
-    "type": "return | call | switch"
+    "type": "return | call | tail_call | switch"
   }
 }
 ```
 
-### on_complete 类型
+## on_complete 类型
 
-**return** - 结束并返回结果
-```json
-{"type": "return"}
-```
+| 类型 | 栈操作 | 说明 |
+|------|--------|------|
+| return | POP | 出栈返回 |
+| call | PUSH | 入栈调用，完成后返回 |
+| tail_call | REPLACE | 替换栈顶，不增加深度 |
+| switch | - | 条件分支 |
 
-**call** - 调用指定 function
-```json
-{"type": "call", "target": "other_function"}
-```
+### switch 条件分支
 
-**switch** - 条件分支
 ```json
 {
   "type": "switch",
   "conditions": [
-    {"when": "条件A", "call": "function_a"},
-    {"when": "条件B", "call": "function_b"}
+    {"when": "$n <= 0", "type": "return"},
+    {"when": "$n > 0", "call": "fn", "args": {...}},
+    {"when": "...", "tail_call": "fn", "args": {...}}
   ],
   "default": "_return"
 }
 ```
 
-## 内置 Function
-
-| 名称 | 作用 |
-|------|------|
-| `_return` | 终止调用链 |
-| `_compact` | 压缩上下文后终止 |
-| `_clear` | 清理上下文后终止 |
-
-## 执行
-
-使用 `/fn` 命令执行：
-
-```
-/fn <function_name> [input]
-```
-
-## 可靠性
-
-1. **链式执行**：调用链必须完整执行到 `_return`
-2. **状态追踪**：`scripts/state.json` 记录当前状态
-3. **恢复机制**：`/continue` 命令可恢复中断的调用链
-
-## 渐进式暴露
-
-通过 `tools` 字段限制 function 可用的工具：
+### sequence 序列（语法糖）
 
 ```json
 {
-  "name": "readonly_task",
-  "task": "...",
-  "tools": ["Read", "Grep"]
+  "type": "sequence",
+  "steps": [
+    {"call": "step1", "args": {...}},
+    {"call": "step2", "args": {"input": "$prev"}}
+  ]
 }
 ```
+
+### loop 循环（语法糖）
+
+```json
+{
+  "type": "loop",
+  "while": "$n > 0",
+  "do": {"tail_call": "fn", "args": {...}},
+  "max_iterations": 100
+}
+```
+
+## 命令
+
+- `/fn name args [--session=id]` - 执行 function
+- `/fn_continue [--session=id]` - 恢复中断的执行
+
+## Session ID 获取（按优先级）
+
+1. 命令行参数 `--session=<id>`（推荐用于并发测试）
+2. 环境变量 `$CC_SESSION_ID`（由 SessionStart hook 注入，如可用）
+3. 如都不可用，使用固定值 `default`
+4. Stop hook 从 stdin 读取 session_id 精确匹配
+
+状态文件: `scripts/states/<session_id>.json`
+
+## 关键规则
+
+1. 用 Write 工具更新 `scripts/states/<session_id>.json`（禁止 Bash 写）
+2. 必须调用工具执行 task，产生可观测输出（不能仅靠对话描述）
+3. return 时**逐帧 POP**，禁止一次清空多帧
+4. 当前会话 stack 非空时不能停止

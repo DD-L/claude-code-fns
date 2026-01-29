@@ -1,0 +1,10 @@
+{
+  "name": "branch_handler_a",
+  "description": "分支A处理器 - 使用 call 调用，会返回",
+  "params": ["from"],
+  "task": "Bash(echo \"[branch_handler_a] called from $from, will return\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "return"
+  }
+}

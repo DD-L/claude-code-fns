@@ -1,0 +1,22 @@
+{
+  "name": "long_task",
+  "description": "长任务测试 - 50 次迭代，测试 stop-hook 机制",
+  "params": ["n", "total"],
+  "task": "Bash(echo \"[long_task] Step $n of $total - $(date +%H:%M:%S)\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$n >= $total",
+        "type": "return"
+      },
+      {
+        "when": "$n < $total",
+        "tail_call": "long_task",
+        "args": {"n": "$n + 1", "total": "$total"}
+      }
+    ],
+    "default": "_return"
+  }
+}

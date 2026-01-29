@@ -1,0 +1,22 @@
+{
+  "name": "grow",
+  "description": "演示栈增长 - 使用 call（非 tail_call），栈深度随调用增加",
+  "params": ["n"],
+  "task": "Bash(echo \"[grow] n=$n, depth will increase...\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$n <= 0",
+        "type": "return"
+      },
+      {
+        "when": "$n > 0",
+        "call": "grow",
+        "args": {"n": "$n - 1"}
+      }
+    ],
+    "default": "_return"
+  }
+}

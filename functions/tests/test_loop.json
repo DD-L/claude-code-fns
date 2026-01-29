@@ -1,0 +1,16 @@
+{
+  "name": "test_loop",
+  "description": "测试循环(loop) - 迭代直到条件不满足",
+  "params": ["count", "max"],
+  "task": "Bash(echo \"[test_loop] iteration $count of $max\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "loop",
+    "while": "$count < $max",
+    "do": {
+      "tail_call": "test_loop",
+      "args": {"count": "$count + 1", "max": "$max"}
+    },
+    "max_iterations": 20
+  }
+}

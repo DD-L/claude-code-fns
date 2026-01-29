@@ -1,0 +1,10 @@
+{
+  "name": "branch_handler_b",
+  "description": "分支B处理器 - 使用 tail_call 调用，不返回",
+  "params": ["from"],
+  "task": "Bash(echo \"[branch_handler_b] tail_called from $from, no return\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "return"
+  }
+}

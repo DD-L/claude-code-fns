@@ -1,0 +1,15 @@
+{
+  "name": "pipeline",
+  "description": "示例：序列执行 - 数据处理管道",
+  "params": ["data"],
+  "task": "Bash(echo \"[pipeline] 开始处理: $data\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "sequence",
+    "steps": [
+      {"call": "validate", "args": {"input": "$data"}},
+      {"call": "transform", "args": {"input": "$prev"}},
+      {"call": "save", "args": {"input": "$prev"}}
+    ]
+  }
+}

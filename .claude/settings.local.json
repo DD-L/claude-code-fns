@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(fn_continue)",
+      "Bash(powershell:*)",
+      "Bash(echo:*)",
+      "Bash(test:*)",
+      "Bash(python scripts/resolve_fn.py:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File scripts/session_start.ps1"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File scripts/check_chain.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}

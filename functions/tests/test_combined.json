@@ -1,0 +1,33 @@
+{
+  "name": "test_combined",
+  "description": "综合测试 - 结合分支、序列、循环的复杂场景",
+  "params": ["mode", "count"],
+  "task": "Bash(echo \"[test_combined] mode=$mode, count=$count\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$mode == 'sequence'",
+        "call": "test_sequence",
+        "args": {"input": "combined_$count"}
+      },
+      {
+        "when": "$mode == 'loop'",
+        "call": "test_loop",
+        "args": {"count": 0, "max": "$count"}
+      },
+      {
+        "when": "$mode == 'recursion'",
+        "call": "test_recursion",
+        "args": {"n": "$count"}
+      },
+      {
+        "when": "$mode == 'tail'",
+        "tail_call": "test_tail_recursion",
+        "args": {"n": "$count"}
+      }
+    ],
+    "default": "_return"
+  }
+}

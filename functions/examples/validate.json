@@ -1,0 +1,8 @@
+{
+  "name": "validate",
+  "description": "验证数据",
+  "params": ["input"],
+  "task": "Bash(echo \"[validate] 验证: $input → valid\")",
+  "tools": ["Bash"],
+  "on_complete": {"type": "return"}
+}

@@ -1,0 +1,15 @@
+{
+  "name": "test_sequence",
+  "description": "测试序列(sequence) - 三步管道，验证 $prev 传递",
+  "params": ["input"],
+  "task": "Bash(echo \"[test_sequence] input=$input\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "sequence",
+    "steps": [
+      {"call": "seq_step1", "args": {"data": "$input"}},
+      {"call": "seq_step2", "args": {"data": "$prev"}},
+      {"tail_call": "seq_step3", "args": {"data": "$prev"}}
+    ]
+  }
+}

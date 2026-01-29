@@ -1,22 +1,22 @@
 {
   "name": "code_review",
   "description": "审查代码质量、安全性和性能问题",
-  "input_hint": "目标路径和审查类型，例如: 'src/ security'",
-  "output_hint": "审查结果总结，包括发现的问题列表",
-  "task": "根据输入的目标路径和审查类型，执行代码审查：\n\n1. 读取目标目录/文件的代码\n2. 根据审查类型（security/performance/quality）分析代码\n3. 列出发现的问题\n4. 给出改进建议\n\n输出格式：\n- 问题数量\n- 问题列表（每个问题包含：位置、描述、严重程度）\n- 改进建议\n\n如果发现严重问题，设置 need_fix = true",
+  "params": ["target", "review_type"],
+  "task": "对 $target 进行 $review_type 类型的代码审查：\n1. 读取目标代码\n2. 分析问题（security/performance/quality）\n3. 输出问题列表和改进建议\n\n设置 need_fix = true/false 表示是否需要修复",
+  "tools": ["Read", "Grep", "Glob"],
   "on_complete": {
     "type": "switch",
     "conditions": [
       {
-        "when": "发现需要修复的问题 (need_fix = true)",
-        "call": "fix_issues"
+        "when": "need_fix == true",
+        "call": "fix_issues",
+        "args": {"target": "$target", "issues": "$issues"}
       },
       {
-        "when": "代码质量良好，无问题",
-        "call": "_return"
+        "when": "need_fix == false",
+        "type": "return"
       }
     ],
     "default": "_return"
-  },
-  "tools": ["Read", "Grep", "Glob"]
+  }
 }

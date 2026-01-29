@@ -3,10 +3,11 @@
 Function Chain Driver - 使用 Claude Agent SDK 确保调用链完整执行
 
 用法:
-    python scripts/run_chain.py <function_name> [input]
+    python scripts/run_chain.py <function_name> [--session=<id>] [input]
     
 示例:
     python scripts/run_chain.py code_review "test_data/sample_code.py security"
+    python scripts/run_chain.py code_review --session=test1 "file.py"
 """
 
 import asyncio
@@ -22,11 +23,11 @@ except ImportError:
     ClaudeAgentOptions = None
 
 
-async def run_with_sdk(function_name: str, input_text: str):
+async def run_with_sdk(function_name: str, input_text: str, session: str = "default"):
     """使用 Agent SDK 执行 function 调用链"""
-    prompt = f"/fn {function_name} {input_text}"
+    prompt = f"/fn {function_name} {input_text} --session={session}"
     
-    print(f"🚀 启动 function 调用链: {function_name}")
+    print(f"🚀 启动 function 调用链: {function_name} (session: {session})")
     print(f"📝 输入: {input_text}")
     print("=" * 50)
     
@@ -51,19 +52,22 @@ async def run_with_sdk(function_name: str, input_text: str):
     return None
 
 
-def run_with_headless(function_name: str, input_text: str):
+def run_with_headless(function_name: str, input_text: str, session: str = "default"):
     """使用 headless 模式作为备用方案"""
     import subprocess
     
-    state_file = "scripts/state.json"
+    state_file = f"scripts/states/{session}.json"
     max_iterations = 20
     
-    print(f"🚀 启动 function 调用链: {function_name}")
+    # 确保目录存在
+    os.makedirs("scripts/states", exist_ok=True)
+    
+    print(f"🚀 启动 function 调用链: {function_name} (session: {session})")
     print(f"📝 输入: {input_text}")
     print("=" * 50)
     
     # 初始命令
-    prompt = f"/fn {function_name} {input_text}"
+    prompt = f"/fn {function_name} {input_text} --session={session}"
     
     for i in range(max_iterations):
         print(f"\n--- 迭代 {i + 1} ---")
@@ -85,15 +89,17 @@ def run_with_headless(function_name: str, input_text: str):
             with open(state_file, 'r') as f:
                 state = json.load(f)
             
-            if state.get("status") == "completed":
+            stack = state.get("stack", [])
+            if state.get("status") == "idle" and len(stack) == 0:
                 print("=" * 50)
                 print("✅ 调用链完成")
-                print(f"执行路径: {' → '.join(state.get('completed_functions', []))}")
+                if state.get("output"):
+                    print(f"输出: {state['output']}")
                 break
-            elif state.get("status") == "running" and state.get("current_function"):
-                # 继续执行
-                prompt = f"继续执行 function 调用链，当前: {state['current_function']}"
-                print(f"🔄 继续: {state['current_function']}")
+            elif state.get("status") == "running" and len(stack) > 0:
+                top_fn = stack[-1].get("function", "?")
+                prompt = f"/fn_continue --session={session}"
+                print(f"🔄 继续: {top_fn} (depth: {len(stack)})")
             else:
                 print("⚠️ 状态异常，停止执行")
                 break
@@ -110,16 +116,24 @@ def main():
         sys.exit(1)
     
     function_name = sys.argv[1]
-    input_text = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else ""
+    session = "default"
+    args = []
+    
+    for arg in sys.argv[2:]:
+        if arg.startswith("--session="):
+            session = arg.split("=", 1)[1]
+        else:
+            args.append(arg)
+    
+    input_text = " ".join(args)
     
     if query is not None:
-        # 使用 Agent SDK
-        asyncio.run(run_with_sdk(function_name, input_text))
+        asyncio.run(run_with_sdk(function_name, input_text, session))
     else:
         print("⚠️ Agent SDK 未安装，使用 headless 备用方案")
         print("   安装: pip install anthropic-claude-agent-sdk")
         print()
-        run_with_headless(function_name, input_text)
+        run_with_headless(function_name, input_text, session)
 
 
 if __name__ == "__main__":

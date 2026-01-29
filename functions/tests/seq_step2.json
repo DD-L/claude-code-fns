@@ -1,0 +1,11 @@
+{
+  "name": "seq_step2",
+  "description": "序列步骤2 - 添加中缀",
+  "params": ["data"],
+  "task": "Bash(echo \"[seq_step2] processing: $data -> ${data}_step2\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "return",
+    "output": "${data}_step2"
+  }
+}

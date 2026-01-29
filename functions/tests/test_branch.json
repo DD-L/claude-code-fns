@@ -1,0 +1,27 @@
+{
+  "name": "test_branch",
+  "description": "测试分支(switch) - 根据 mode 选择不同路径",
+  "params": ["mode"],
+  "task": "Bash(echo \"[test_branch] mode=$mode\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$mode == 'A'",
+        "call": "branch_handler_a",
+        "args": {"from": "test_branch"}
+      },
+      {
+        "when": "$mode == 'B'",
+        "tail_call": "branch_handler_b",
+        "args": {"from": "test_branch"}
+      },
+      {
+        "when": "$mode == 'C'",
+        "type": "return"
+      }
+    ],
+    "default": "_return"
+  }
+}

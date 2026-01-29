@@ -1,0 +1,16 @@
+{
+  "name": "batch_process",
+  "description": "示例：循环执行 - 批量处理",
+  "params": ["items", "index"],
+  "task": "Bash(echo \"[batch] 处理第 $index 项\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "loop",
+    "while": "$index < $items",
+    "do": {
+      "tail_call": "batch_process",
+      "args": {"items": "$items", "index": "$index + 1"}
+    },
+    "max_iterations": 100
+  }
+}
