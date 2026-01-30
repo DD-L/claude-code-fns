@@ -5,7 +5,9 @@
       "Bash(powershell:*)",
       "Bash(echo:*)",
       "Bash(test:*)",
-      "Bash(python scripts/resolve_fn.py:*)"
+      "Bash(python scripts/resolve_fn.py:*)",
+      "Bash(.scripts/stack_ops.ps1)",
+      "Bash(python:*)"
     ]
   },
   "hooks": {

@@ -17,9 +17,9 @@
 
 ## 执行流程
 
-1. 读取 `scripts/states/<WT_SESSION>.json`
+1. 使用 stack_ops 工具查看状态：`.\scripts\stack_ops.ps1 -Session <id> -Op show`
 2. 如果 `status == "running"` 且 `stack` 不为空：
-   - 从栈顶函数继续执行
+   - 从栈顶函数继续执行（按 /fn 的执行流程）
 3. 否则输出 "没有需要恢复的调用链"
 
 $ARGUMENTS

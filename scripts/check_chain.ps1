@@ -18,85 +18,125 @@ try {
 } catch {
 }
 
-Add-Content -Path $logFile -Value "[$timestamp] Stop hook triggered"
-Add-Content -Path $logFile -Value "[$timestamp] WT_SESSION: $env:WT_SESSION"
-Add-Content -Path $logFile -Value "[$timestamp] Input length: $($inputJson.Length)"
+Add-Content -Path $logFile -Value "[$timestamp] Stop hook triggered" -Encoding UTF8
+Add-Content -Path $logFile -Value "[$timestamp] WT_SESSION: $env:WT_SESSION" -Encoding UTF8
+Add-Content -Path $logFile -Value "[$timestamp] Input length: $($inputJson.Length)" -Encoding UTF8
 
 $stopHookActive = $false
 if ($inputJson) {
     try {
         $inputObj = $inputJson | ConvertFrom-Json
         $stopHookActive = $inputObj.stop_hook_active
-        Add-Content -Path $logFile -Value "[$timestamp] Parsed stop_hook_active: $stopHookActive"
+        Add-Content -Path $logFile -Value "[$timestamp] Parsed stop_hook_active: $stopHookActive" -Encoding UTF8
     } catch {
-        Add-Content -Path $logFile -Value "[$timestamp] JSON parse error: $_"
+        Add-Content -Path $logFile -Value "[$timestamp] JSON parse error: $_" -Encoding UTF8
     }
 }
 
 if ($stopHookActive -eq $true) {
-    Add-Content -Path $logFile -Value "[$timestamp] stop_hook_active=true, allowing stop"
+    Add-Content -Path $logFile -Value "[$timestamp] stop_hook_active=true, allowing stop" -Encoding UTF8
     exit 0
 }
 
 $wtSession = $env:WT_SESSION
 if (-not $wtSession) {
-    Add-Content -Path $logFile -Value "[$timestamp] No WT_SESSION, allowing stop"
+    Add-Content -Path $logFile -Value "[$timestamp] No WT_SESSION, allowing stop" -Encoding UTF8
     exit 0
 }
 
 $StateFile = "$StatesDir\$wtSession.json"
-Add-Content -Path $logFile -Value "[$timestamp] Checking state file: $StateFile"
+Add-Content -Path $logFile -Value "[$timestamp] Checking state file: $StateFile" -Encoding UTF8
 
 if (-not (Test-Path $StateFile)) {
-    Add-Content -Path $logFile -Value "[$timestamp] State file not found, allowing stop"
+    Add-Content -Path $logFile -Value "[$timestamp] State file not found, allowing stop" -Encoding UTF8
     exit 0
 }
 
 try {
-    $state = Get-Content $StateFile -Raw | ConvertFrom-Json
+    $state = Get-Content $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
-    Add-Content -Path $logFile -Value "[$timestamp] Failed to parse state file: $_"
+    Add-Content -Path $logFile -Value "[$timestamp] Failed to parse state file: $_" -Encoding UTF8
     exit 0
 }
 
-if ($state.status -eq "running" -and $state.stack -and $state.stack.Count -gt 0) {
-    $depth = $state.stack.Count
+# Check stack count directly from array (authoritative source, not depth field)
+$stackLen = if ($state.stack) { $state.stack.Count } else { 0 }
+$status = if ($state.status) { $state.status } else { "idle" }
+
+# Always log state info for audit
+Add-Content -Path $logFile -Value "[$timestamp] State: status=$status, stack_len=$stackLen" -Encoding UTF8
+
+if ($stackLen -gt 0) {
     $topFrame = $state.stack[-1]
     
-    Add-Content -Path $logFile -Value "[$timestamp] Stack NOT empty! Blocking stop."
+    # Log warning for stack leak (idle but stack not empty)
+    if ($status -eq "idle") {
+        Add-Content -Path $logFile -Value "[$timestamp] WARNING: Stack leak detected! status=idle but stack_len=$stackLen" -Encoding UTF8
+    }
     
-    # Build message
-    $msg = "[STOP-HOOK] Stack NOT empty ($depth frame$(if($depth -gt 1){'s'}))"
-    $msg += "`nTop: $($topFrame.function)"
+    Add-Content -Path $logFile -Value "[$timestamp] Stack NOT empty! Blocking stop." -Encoding UTF8
+    Add-Content -Path $logFile -Value "[$timestamp]   Top frame: $($topFrame.function)" -Encoding UTF8
     
-    # Show top frame args (compact JSON)
+    # Log call chain
+    if ($stackLen -gt 1) {
+        $chainFns = @()
+        foreach ($frame in $state.stack) { $chainFns += $frame.function }
+        Add-Content -Path $logFile -Value "[$timestamp]   Call chain: $($chainFns -join ' -> ')" -Encoding UTF8
+    }
+    
+    # Build user-friendly message
+    $leakNote = if ($status -eq "idle") { " [LEAK]" } else { "" }
+    $msg = "[!][STOP-HOOK] Cannot stop: Stack not empty$leakNote"
+    $msg += "`n  Session: $wtSession"
+    $msg += "`n  Stack depth: $stackLen"
+    
+    # Top frame with args
+    $topFn = $topFrame.function
     if ($topFrame.args) {
         try {
-            $argsJson = $topFrame.args | ConvertTo-Json -Compress -Depth 2
-            $msg += "`nArgs: $argsJson"
+            $argPairs = @()
+            $topFrame.args.PSObject.Properties | ForEach-Object {
+                $argPairs += "$($_.Name)=$($_.Value)"
+            }
+            if ($argPairs.Count -gt 0) {
+                $topFn += " ($($argPairs -join ', '))"
+            }
         } catch {}
     }
+    $msg += "`n  Top frame: $topFn"
     
-    # Show simple stack trace (max 5 frames from top)
-    if ($depth -gt 1) {
-        $msg += "`nStack (bottom to top):"
-        $showCount = [Math]::Min($depth, 5)
-        $startIdx = $depth - $showCount
+    # Call chain (show all frames with arrow)
+    if ($stackLen -ge 1) {
+        $chainParts = @()
+        $showCount = [Math]::Min($stackLen, 5)
+        $startIdx = $stackLen - $showCount
         if ($startIdx -gt 0) {
-            $msg += "`n  ... ($startIdx more)"
+            $chainParts += "..."
         }
-        for ($i = $startIdx; $i -lt $depth; $i++) {
-            $frame = $state.stack[$i]
-            $pointer = if ($i -eq $depth - 1) { " <- TOP" } else { "" }
-            $msg += "`n  [$i] $($frame.function)$pointer"
+        for ($i = $startIdx; $i -lt $stackLen; $i++) {
+            $chainParts += $state.stack[$i].function
         }
+        $msg += "`n  Call chain: $($chainParts -join ' -> ')"
     }
     
-    $msg += "`nYou MUST continue until stack is empty. Run: /fn_continue"
+    $msg += "`n  To continue: /fn_continue --session=$wtSession"
     
     [Console]::Error.WriteLine($msg)
     exit 2
 }
 
-Add-Content -Path $logFile -Value "[$timestamp] Stack empty or not running, allowing stop"
+# Task complete - output brief info
+$outputInfo = ""
+if ($state.output) {
+    $outStr = "$($state.output)"
+    if ($outStr.Length -gt 100) {
+        $outStr = $outStr.Substring(0, 97) + "..."
+    }
+    $outputInfo = " | output: $outStr"
+}
+Add-Content -Path $logFile -Value "[$timestamp] Stack empty (stack_len=0), allowing stop" -Encoding UTF8
+
+# Brief completion message to stderr (informational, still exit 0)
+$completeMsg = "[ok] $wtSession | idle$outputInfo"
+[Console]::Error.WriteLine($completeMsg)
 exit 0
