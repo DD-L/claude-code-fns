@@ -4,22 +4,46 @@
 
 ## 用法
 ```
-/fn_continue [--session=<id>]
+/fn_continue
 ```
-
-## Session ID 获取
-
-1. 如有 `--session=<id>` 参数，直接使用
-2. 否则执行：`echo "WT_SESSION=$WT_SESSION"`
-   - **⚠️ 必须直接用 echo，禁止用 powershell -Command 转发**
-   - 解析输出 `=` 后的值作为 session_id
-3. 若为空，使用 `default`
 
 ## 执行流程
 
-1. 使用 stack_ops 工具查看状态：`.\scripts\stack_ops.ps1 -Session <id> -Op show`
-2. 如果 `status == "running"` 且 `stack` 不为空：
-   - 从栈顶函数继续执行（按 /fn 的执行流程）
-3. 否则输出 "没有需要恢复的调用链"
+### 1. 调用 fn-controller
+
+```
+使用 fn-controller subagent：
+  operation=recover
+```
+
+### 2. 根据返回决定操作
+
+| fn-controller 返回 | 主会话操作 |
+|-------------------|-----------|
+| `action: "nothing_to_recover"` | 输出 "没有需要恢复的调用链" |
+| `action: "execute_task"` | 执行 task，然后继续循环 |
+| `action: "ask_user"` | 询问用户选择，再调用 fn-controller |
+| `action: "complete"` | 输出结果，结束 |
+
+### 3. 继续执行循环
+
+收到 task → 执行 → 新建 fn-controller：
+```
+使用 fn-controller subagent：
+  operation=continue, task_result=<执行结果>
+```
+循环直到 complete
+
+## 错误状态处理
+
+当 fn-controller 返回 `action: "ask_user"` 时，询问用户：
+1. retry - 重新执行栈顶函数
+2. skip - pop 当前函数继续
+3. clear - 清空栈结束
+
+```
+使用 fn-controller subagent：
+  operation=error_recovery, action=<用户选择>
+```
 
 $ARGUMENTS

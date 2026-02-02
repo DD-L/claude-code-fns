@@ -34,8 +34,35 @@
       "description": "参数名列表"
     },
     "task": {
-      "type": "string",
-      "description": "任务提示词，可使用 $param_name 引用参数"
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "任务提示词（简化写法，等价于 execute_in: main）"
+        },
+        {
+          "type": "object",
+          "description": "任务定义对象（完整写法）",
+          "required": ["prompt"],
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "description": "任务提示词，可使用 $param_name 引用参数"
+            },
+            "tools": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "此 task 可使用的工具列表（覆盖顶层 tools）"
+            },
+            "execute_in": {
+              "type": "string",
+              "description": "执行位置: main(默认), subagent, subagent@haiku, subagent@sonnet, subagent@opus",
+              "pattern": "^(main|subagent(@(haiku|sonnet|opus))?)$",
+              "default": "main"
+            }
+          }
+        }
+      ],
+      "description": "任务定义，可以是字符串（简化）或对象（完整）"
     },
     "tools": {
       "type": "array",

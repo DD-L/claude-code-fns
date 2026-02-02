@@ -3,6 +3,10 @@
 # exit 0: allow stop
 # exit 2 + stderr: block stop, stderr content is fed back to Claude
 
+param(
+    [string]$TestSession  # Optional: override WT_SESSION for testing
+)
+
 $StatesDir = "$PSScriptRoot\states"
 
 if (-not (Test-Path $StatesDir)) {
@@ -13,9 +17,12 @@ $logFile = "$StatesDir\.hook_debug.log"
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
 $inputJson = ""
-try {
-    $inputJson = [Console]::In.ReadToEnd()
-} catch {
+# Only read stdin if it's actually redirected (piped), not interactive
+if ([Console]::IsInputRedirected) {
+    try {
+        $inputJson = [Console]::In.ReadToEnd()
+    } catch {
+    }
 }
 
 Add-Content -Path $logFile -Value "[$timestamp] Stop hook triggered" -Encoding UTF8
@@ -38,7 +45,8 @@ if ($stopHookActive -eq $true) {
     exit 0
 }
 
-$wtSession = $env:WT_SESSION
+# Use TestSession parameter if provided (for testing), otherwise use WT_SESSION env var
+$wtSession = if ($TestSession) { $TestSession } else { $env:WT_SESSION }
 if (-not $wtSession) {
     Add-Content -Path $logFile -Value "[$timestamp] No WT_SESSION, allowing stop" -Encoding UTF8
     exit 0
@@ -84,7 +92,7 @@ if ($stackLen -gt 0) {
         Add-Content -Path $logFile -Value "[$timestamp]   Call chain: $($chainFns -join ' -> ')" -Encoding UTF8
     }
     
-    # Build user-friendly message
+    # Build user-friendly message with resume instructions
     $leakNote = if ($status -eq "idle") { " [LEAK]" } else { "" }
     $msg = "[!][STOP-HOOK] Cannot stop: Stack not empty$leakNote"
     $msg += "`n  Session: $wtSession"
@@ -119,7 +127,13 @@ if ($stackLen -gt 0) {
         $msg += "`n  Call chain: $($chainParts -join ' -> ')"
     }
     
-    $msg += "`n  To continue: /fn_continue --session=$wtSession"
+    $msg += "`n"
+    $msg += "`n[ACTION REQUIRED] Call fn-controller subagent:"
+    $msg += "`n"
+    $msg += "`n  operation=continue, task_result=<last task result>"
+    $msg += "`n"
+    $msg += "`n  (fn-controller will auto-obtain session_id)"
+    Add-Content -Path $logFile -Value "[$timestamp] Prompting for fn-controller continue" -Encoding UTF8
     
     [Console]::Error.WriteLine($msg)
     exit 2
@@ -136,7 +150,7 @@ if ($state.output) {
 }
 Add-Content -Path $logFile -Value "[$timestamp] Stack empty (stack_len=0), allowing stop" -Encoding UTF8
 
-# Brief completion message to stderr (informational, still exit 0)
+# Brief completion message to stderr (captured by cmd 2>&1, still exit 0)
 $completeMsg = "[ok] $wtSession | idle$outputInfo"
 [Console]::Error.WriteLine($completeMsg)
 exit 0

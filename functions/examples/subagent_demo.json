@@ -1,0 +1,25 @@
+{
+  "name": "subagent_demo",
+  "description": "演示 execute_in 字段的用法 - 在不同执行位置运行 task",
+  "params": ["mode"],
+  "task": {
+    "prompt": "根据 mode=$mode 展示执行位置信息。使用 echo 输出当前时间和执行环境。",
+    "tools": ["Bash"],
+    "execute_in": "subagent@haiku"
+  },
+  "on_complete": {
+    "type": "switch",
+    "conditions": [
+      {
+        "when": "$mode == 'quick'",
+        "call": "_return"
+      },
+      {
+        "when": "$mode == 'chain'",
+        "call": "subagent_demo_step2",
+        "args": {"input": "$output"}
+      }
+    ],
+    "default": "_return"
+  }
+}

@@ -551,3 +551,396 @@ python scripts/check_calls.py
 # ✗ examples/pipeline -> unknown_fn => NOT FOUND
 ```
 
+---
+
+## Subagent 架构设计（采纳方案）
+
+### 1. 架构概览：混合模式
+
+采用混合模式架构，平衡可靠性和 token 成本：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 主会话 (Main Session)                                        │
+│                                                              │
+│  fn-controller subagent (可 resume):                        │
+│    - 负责: 栈操作、函数解析、控制流                         │
+│    - 通过 resume 复用（节省 token）                         │
+│    - 当上下文达到阈值时自动 compact                          │
+│                                                              │
+│  task 执行策略:                                              │
+│    - task.execute_in == "main":                             │
+│        主会话直接执行（默认）                                │
+│                                                              │
+│    - task.execute_in == "subagent":                         │
+│        主会话调用临时 task-executor subagent                │
+│        执行后 subagent 结束，结果返回主会话                  │
+│        主会话通过 resume 通知 controller 继续               │
+│                                                              │
+│  可靠性保障:                                                 │
+│    - stop-hook: 检查 state.json，非空栈则强制继续           │
+│    - 状态完全持久化在 state.json                            │
+│    - 任何崩溃后可从 state.json 恢复                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2. 执行分工
+
+| 组件 | 执行位置 | 说明 |
+|------|---------|------|
+| function 中的 task | 主会话（默认）或 subagent（可配置） | 实际业务逻辑 |
+| 栈操作 (push/pop/tail_call) | fn-controller subagent | 保持主会话干净 |
+| 函数解析和分发 | fn-controller subagent | 静态分发逻辑 |
+| 控制流处理 (switch/sequence/loop) | fn-controller subagent | 流程控制 |
+| state.json 读写 | fn-controller subagent | 状态管理 |
+
+### 3. task.execute_in 字段设计
+
+在 function 定义中新增 `execute_in` 字段，控制 task 的执行位置：
+
+```json
+{
+  "name": "complex_task",
+  "description": "需要在 subagent 中执行的复杂任务",
+  "params": ["input"],
+  "task": {
+    "prompt": "处理输入数据：$input",
+    "tools": ["Bash", "Read", "Edit"],
+    "execute_in": "subagent@haiku"
+  },
+  "on_complete": {
+    "type": "return"
+  }
+}
+```
+
+**execute_in 语法：**
+
+| 值 | 含义 |
+|----|------|
+| `"main"` | 在主会话中执行（默认值） |
+| `"subagent"` | 在临时 subagent 中执行，使用默认模型 |
+| `"subagent@haiku"` | 在临时 subagent 中执行，使用 haiku 模型 |
+| `"subagent@sonnet"` | 在临时 subagent 中执行，使用 sonnet 模型 |
+| `"subagent@opus"` | 在临时 subagent 中执行，使用 opus 模型 |
+
+**简化写法（向后兼容）：**
+
+如果 task 是字符串而非对象，等价于 `execute_in: "main"`：
+
+```json
+{
+  "name": "simple_task",
+  "task": "echo 'Hello World'",
+  "tools": ["Bash"]
+}
+```
+
+### 4. fn-controller subagent 配置
+
+创建 `.claude/agents/fn-controller.md`：
+
+```markdown
+---
+name: fn-controller
+description: Function execution framework controller. Manages call stack, function dispatch, and control flow. Use proactively for all cc_function framework operations.
+tools: Read, Bash, Glob, Grep
+model: haiku
+permissionMode: acceptEdits
+---
+
+You are the function execution controller for the cc_function framework.
+
+## Responsibilities
+
+1. **State Management**: Read and update `scripts/states/{session_id}.json`
+2. **Function Resolution**: Use `scripts/resolve_fn.ps1` or `scripts/resolve_fn.py` for static function dispatch
+3. **Stack Operations**: Perform push, pop, tail_call operations
+4. **Control Flow**: Handle switch, sequence, loop constructs
+5. **Agent ID Persistence**: Save your agent ID to state.json for resume
+
+## Execution Protocol
+
+When invoked:
+1. Read current state from state.json
+2. Determine next action based on stack top
+3. Perform required stack operations
+4. Update state.json with new state
+5. Return task definition for main session to execute
+
+## Output Format
+
+Always output a JSON response:
+```json
+{
+  "action": "execute_task | complete | error",
+  "task": {
+    "prompt": "...",
+    "tools": ["Bash"],
+    "execute_in": "main"
+  },
+  "state": {
+    "stack_depth": 1,
+    "current_function": "route_a"
+  }
+}
+```
+
+## Critical Rules
+
+- NEVER execute tasks yourself - return task definitions only
+- ALWAYS use scripts for stack operations
+- ALWAYS auto-obtain session_id via `echo "WT_SESSION=$WT_SESSION"`
+
+### 5. Resume 机制验证（历史记录）
+
+**Resume 机制验证结论：**
+
+| 方式 | 结果 | 说明 |
+|------|------|------|
+| 显式 "Resume agent {id}" | ❌ 不可靠 | 经常失败，Invalid tool parameters |
+| 模糊 "Continue that task" | ❌ 不可靠 | 失败或创建新 agent |
+
+**已知问题（Claude Code 2026.01）：**
+- Agent transcripts 不存储 user prompts，导致 resume 丢失上下文
+- Agent ID 在 CLI 输出中不可靠显示
+- Resume 功能无法按预期工作
+
+**架构决策：无 Resume 模式**
+
+由于 Resume 机制不可靠，本框架采用"每次新建 subagent + state.json 持久化"策略：
+1. **不依赖 resume**：每次调用都创建新的 fn-controller subagent
+2. **状态持久化**：所有状态通过 state.json 保持
+3. **session_id 由 fn-controller 自动获取**：主会话不处理 session
+
+**session_id 获取规则（fn-controller 内部）**
+
+```bash
+echo "WT_SESSION=$WT_SESSION"
+```
+
+⚠️ **禁止**：使用 `powershell -Command` 转发此命令（会导致环境变量丢失）
+
+**验证结论**：WT_SESSION 环境变量在 subagent 中可访问，与主会话相同
+
+**state.json 扩展：**
+
+```json
+{
+  "session_id": "WT_SESSION_xxx",
+  "status": "running",
+  "stack": [
+    {
+      "function": "tests/test_sequence",
+      "args": {"input": "hello"},
+      "step_index": 1
+    }
+  ],
+  "last_updated": "2025-01-30T10:00:00Z"
+}
+```
+
+### 6. 执行流程详解
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ 用户调用: fn route_a --n=3                                           │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ 主会话: 初始化                                                        │
+│   1. 解析用户命令参数                                                 │
+│   2. 调用 fn-controller subagent：                                   │
+│      operation=start, function=route_a, args={n:3}                   │
+│      (session_id 可选传递，fn-controller 可自动获取 WT_SESSION)      │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ fn-controller subagent:                                              │
+│   1. 读取/创建 state.json                                            │
+│   2. 解析函数 route_a                                                │
+│   3. 将 route_a 压入栈                                               │
+│   4. 返回 task 定义                                                   │
+│   (agent_id 由系统自动包含在 Task 工具返回中)                        │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ 主会话:                                                              │
+│   1. 收到 task 定义                                                  │
+│   2. 根据 execute_in 决定执行位置                                    │
+│      - "main": 直接执行                                              │
+│      - "subagent": 调用临时 task-executor subagent                  │
+│   3. 执行完成后，**新建** fn-controller subagent（不 resume）:       │
+│      operation=continue, task_result="执行结果摘要"                   │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ fn-controller subagent (新建，从 state.json 恢复状态):               │
+│   1. 读取 state.json                                                 │
+│   2. 处理 on_complete                                                │
+│   3. 根据条件决定下一步 (switch/call/return)                         │
+│   4. 更新栈状态                                                       │
+│   5. 返回下一个 task 或标记完成                                       │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                            [循环直到栈空]
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ 主会话: 完成                                                         │
+│   - 栈空，执行结束                                                   │
+│   - stop-hook 检测到空栈，允许停止                                   │
+└──────────────────────────────────────────────────────────────────────┘
+```### 7. stop-hook 与 Agent ID 协作
+
+stop-hook 脚本需要更新，支持 resume controller：
+
+```powershell
+# scripts/stop_hook.ps1 (伪代码)
+
+$sessionId = $env:WT_SESSION
+$statePath = "scripts/states/$sessionId.json"
+
+if (Test-Path $statePath) {
+    $state = Get-Content $statePath | ConvertFrom-Json
+    
+    if ($state.stack.Count -gt 0) {
+        # 栈非空，需要继续执行
+        Write-Output @"
+[cc_function] Stack is not empty. Continuing execution...
+
+Call fn-controller subagent with operation=continue to process the function stack.
+Current stack depth: $($state.stack.Count)
+Top function: $($state.stack[-1].function)
+"@
+    }
+    # 栈空则不输出，允许正常停止
+}
+```
+
+### 8. 技术限制与应对
+
+| 限制 | 影响 | 应对策略 |
+|-----|------|---------|
+| Subagent 不能 spawn subagent | 无法在 subagent 内部再调用 subagent | 所有 subagent 调用必须由主会话发起 |
+| stop-hook 只能输出提示文本 | 不能直接调用 API | 输出提示词让 Claude 调用 fn-controller |
+
+---
+
+## 内置函数设计（_clear 和 _compact）
+
+### 设计状态：已设计，暂不实现
+
+### 1. _clear 内置函数
+
+**效果：** 等同于交互式 `/clear` 命令
+
+**实现方案：** 新会话 + 栈状态持久化
+
+```json
+{
+  "_clear": {
+    "description": "清理主会话上下文",
+    "implementation": "new_session",
+    "mechanism": "保存当前栈状态到 state.json，启动新 claude 进程，新进程读取 state.json 继续执行"
+  }
+}
+```
+
+**执行流程：**
+1. 将当前栈状态完整保存到 state.json
+2. 通过 stop-hook 或脚本触发新 claude 进程
+3. 新进程启动后读取 state.json，恢复执行
+
+### 2. _compact 内置函数
+
+**效果：** 等同于交互式 `/compact` 命令
+
+**实现方案：** 利用 subagent 独立上下文 + auto-compaction
+
+```json
+{
+  "_compact": {
+    "description": "压缩主会话上下文",
+    "implementation": "subagent_isolation",
+    "mechanism": "将后续操作转移到 subagent 执行，利用 subagent 的 auto-compaction 机制"
+  }
+}
+```
+
+**说明：**
+- Subagent 支持 auto-compaction（~95% 容量时自动触发）
+- 可通过 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` 环境变量调整阈值
+- 实现隐式 compact 效果
+
+### 3. 显式与隐式上下文管理
+
+| 类型 | 触发方式 | 效果 |
+|------|---------|------|
+| 显式 _clear | 函数调用 `_clear()` | 完全清理上下文，启动新会话 |
+| 显式 _compact | 函数调用 `_compact()` | 压缩当前上下文 |
+| 隐式 compact | subagent auto-compaction | 自动压缩 subagent 上下文 |
+| 隐式隔离 | execute_in: "subagent" | task 在独立上下文执行，不污染主会话 |
+
+---
+
+## Schema 更新汇总
+
+### function.json 扩展
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "params": { "type": "array", "items": { "type": "string" } },
+    "task": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "prompt": { "type": "string" },
+            "tools": { "type": "array", "items": { "type": "string" } },
+            "execute_in": {
+              "type": "string",
+              "pattern": "^(main|subagent(@(haiku|sonnet|opus))?)$",
+              "default": "main"
+            }
+          },
+          "required": ["prompt"]
+        }
+      ]
+    },
+    "tools": { "type": "array", "items": { "type": "string" } },
+    "on_complete": { "$ref": "#/definitions/on_complete" }
+  }
+}
+```
+
+### state.json 扩展
+
+```json
+{
+  "session_id": "string",
+  "status": "idle | running | error",
+  "stack": [
+    {
+      "function": "string (FQN)",
+      "args": { "key": "value" },
+      "step_index": "number (for sequence)",
+      "loop_iteration": "number (for loop)",
+      "return_value": "any"
+    }
+  ],
+  "last_updated": "ISO8601 timestamp",
+  "error": "string | null"
+}
+```

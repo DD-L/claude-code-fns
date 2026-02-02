@@ -1,0 +1,13 @@
+{
+  "name": "subagent_demo_step2",
+  "description": "subagent_demo 的第二步 - 在主会话中执行",
+  "params": ["input"],
+  "task": {
+    "prompt": "接收上一步的输出: $input，在主会话中处理并输出最终结果。",
+    "tools": ["Bash"],
+    "execute_in": "main"
+  },
+  "on_complete": {
+    "type": "return"
+  }
+}

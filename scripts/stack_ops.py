@@ -16,23 +16,27 @@ Stack Operations Tool - Reliable stack operations with diff feedback
   show                                                 Show full state
   init                                                 Initialize/reset state
   clear                                                Clear stack and output
-  set_status    idle|running                           Set status
+  set_status    idle|running|error                     Set status
   set_output    <value>                                Set session output
+  set_agent_id  <agent_id>                             Set controller agent ID (for resume)
   set_var       [--var.k=v]...                         Batch set temp variables
   get_var       <key>                                  Read variable (args/prev/vars)
   del_var       <key>...                               Batch delete temp variables
+  assert_empty                                         Assert stack is empty (exit 1 if not)
+  get_next_action                                      Get stack state + suggested next action (JSON)
 ================================================================================
 
 Usage:
-    python scripts/stack_ops.py <session_id> <operation> [options]
-    
-Arguments (use --arg.key=value to avoid shell escaping):
-    python scripts/stack_ops.py abc push route_a --arg.n=5 --arg.from=main
-    python scripts/stack_ops.py abc tail_call route_b --arg.n=4
+    python scripts/stack_ops.py <operation> [options]        # auto-detect session
+    python scripts/stack_ops.py <session_id> <operation>     # explicit session (for testing)
 
-Variables:
-    python scripts/stack_ops.py abc set_var --var.x=100 --var.y=200 --var.name=test
-    python scripts/stack_ops.py abc del_var x y name
+Session ID is auto-detected from $WT_SESSION environment variable.
+
+Examples:
+    python scripts/stack_ops.py show
+    python scripts/stack_ops.py push route_a --arg.n=5 --arg.from=main
+    python scripts/stack_ops.py tail_call route_b --arg.n=4
+    python scripts/stack_ops.py return "completed"
 
 Output:
     BEFORE/AFTER summary + detailed DIFF for reviewing operation results
@@ -95,7 +99,7 @@ def load_state(session_id: str, must_exist: bool = False) -> dict:
     state_file = get_state_file(session_id)
     if state_file.exists():
         try:
-            with open(state_file, 'r', encoding='utf-8') as f:
+            with open(state_file, 'r', encoding='utf-8-sig') as f:
                 return json.load(f)
         except json.JSONDecodeError:
             return {"status": "idle", "stack": [], "output": None}
@@ -121,10 +125,15 @@ def load_state(session_id: str, must_exist: bool = False) -> dict:
 
 def save_state(session_id: str, state: dict) -> None:
     """保存状态文件，包含读回验证"""
+    from datetime import datetime
+    
     state_file = get_state_file(session_id)
     
     # Expected stack length before save
     expected_len = len(state.get("stack", []))
+    
+    # Update last_updated timestamp (ISO8601 format)
+    state["last_updated"] = datetime.now().isoformat()
     
     # Atomic write
     with open(state_file, 'w', encoding='utf-8') as f:
@@ -132,7 +141,7 @@ def save_state(session_id: str, state: dict) -> None:
     
     # Read-back verification
     try:
-        with open(state_file, 'r', encoding='utf-8') as f:
+        with open(state_file, 'r', encoding='utf-8-sig') as f:
             verified = json.load(f)
         verified_len = len(verified.get("stack", []))
         if verified_len != expected_len:
@@ -180,11 +189,12 @@ def format_stack(stack: list) -> str:
 def format_state_summary(state: dict) -> str:
     """
     超紧凑摘要格式：一行显示核心信息
-    格式: status=X depth=N top=<fn> [has_output]
+    格式: status=X depth=N top=<fn> [has_agent_id] [has_output]
     """
     status = state.get("status", "idle")
     stack = state.get("stack", [])
     output = state.get("output")
+    agent_id = state.get("controller_agent_id")
     
     parts = [f"status={status}", f"depth={len(stack)}"]
     
@@ -195,6 +205,8 @@ def format_state_summary(state: dict) -> str:
             top_fn = "..." + top_fn[-27:]
         parts.append(f"top={top_fn}")
     
+    if agent_id:
+        parts.append("[has_agent_id]")
     if output is not None:
         parts.append("[has_output]")
     
@@ -329,6 +341,18 @@ def compute_diff(before: dict, after: dict) -> List[str]:
         else:
             diff_lines.append(f"~ output: changed")
     
+    # controller_agent_id 变化
+    before_agent = before.get("controller_agent_id")
+    after_agent = after.get("controller_agent_id")
+    if before_agent != after_agent:
+        if before_agent is None and after_agent is not None:
+            agent_preview = after_agent[:20] + "..." if len(after_agent) > 20 else after_agent
+            diff_lines.append(f"+ controller_agent_id: {agent_preview}")
+        elif before_agent is not None and after_agent is None:
+            diff_lines.append(f"- controller_agent_id: cleared")
+        else:
+            diff_lines.append(f"~ controller_agent_id: changed")
+    
     return diff_lines
 
 
@@ -385,6 +409,15 @@ def op_init(session_id: str, args: list) -> tuple:
     return before, after, None
 
 
+def validate_function_name(fqn: str) -> str:
+    """验证函数名，返回错误信息或 None"""
+    if fqn.startswith('-'):
+        return f"Invalid function name '{fqn}': cannot start with '-' (likely argument format error)"
+    if not fqn or fqn.isspace():
+        return "Function name cannot be empty"
+    return None
+
+
 def op_push(session_id: str, args: list) -> tuple:
     """压栈操作"""
     if not args:
@@ -392,6 +425,11 @@ def op_push(session_id: str, args: list) -> tuple:
         return before, before, f"Missing <fqn>\nUsage: stack_ops.py {session_id} push <fqn> [--arg.k=v]"
     
     function_fqn = args[0]
+    
+    # 验证函数名
+    if err := validate_function_name(function_fqn):
+        before = load_state(session_id)
+        return before, before, err
     frame_args = {}
     step_index = None
     
@@ -490,7 +528,13 @@ def op_peek(session_id: str, args: list) -> tuple:
 
 
 def op_update(session_id: str, args: list) -> tuple:
-    """更新栈顶帧：支持 step_index, prev, output, args, vars"""
+    """更新栈顶帧：支持 step_index, prev, output, args, vars
+    
+    step_index 更新规则（防止 sequence 跳步 bug）：
+    - 必须连续递增：new_step_index == current_step_index + 1
+    - 或者初始设置：current_step_index 不存在 且 new_step_index == 0
+    - 使用 --force-step-index 可跳过验证（仅用于测试/恢复）
+    """
     before = load_state(session_id, must_exist=True)
     
     if not before.get("stack"):
@@ -499,13 +543,39 @@ def op_update(session_id: str, args: list) -> tuple:
     after = copy.deepcopy(before)
     top_frame = after["stack"][-1]
     
+    # 检查是否强制跳过 step_index 验证
+    force_step_index = "--force-step-index" in args
+    
     # 解析参数
     for arg in args:
         if arg.startswith("--step_index="):
             try:
-                top_frame["step_index"] = int(arg.split("=", 1)[1])
+                new_step_index = int(arg.split("=", 1)[1])
             except ValueError:
                 return before, before, "step_index must be an integer"
+            
+            # step_index 连续性验证（防止 sequence 跳步 bug）
+            current_step_index = top_frame.get("step_index")
+            
+            if not force_step_index:
+                if current_step_index is None:
+                    # First time setting step_index
+                    if new_step_index != 0 and new_step_index != 1:
+                        # Allow 0 (initial) or 1 (first update)
+                        print(f"[WARN] step_index first set to {new_step_index}, expected 0 or 1", file=sys.stderr)
+                else:
+                    # Already has step_index, must increment continuously
+                    expected = current_step_index + 1
+                    if new_step_index != expected:
+                        error_msg = (
+                            f"step_index not continuous! current={current_step_index}, new={new_step_index}, expected={expected}\n"
+                            f"This may cause sequence to skip steps!\n"
+                            f"Use --force-step-index to bypass validation"
+                        )
+                        return before, before, error_msg
+            
+            top_frame["step_index"] = new_step_index
+            
         elif arg.startswith("--prev="):
             top_frame["prev"] = arg.split("=", 1)[1]
         elif arg.startswith("--output="):
@@ -532,12 +602,12 @@ def op_set_status(session_id: str, args: list) -> tuple:
     """设置状态"""
     if not args:
         before = load_state(session_id)
-        return before, before, f"Missing <idle|running>\nUsage: stack_ops.py {session_id} set_status idle"
+        return before, before, f"Missing <idle|running|error>\nUsage: stack_ops.py {session_id} set_status idle"
     
     status = args[0]
-    if status not in ("idle", "running"):
+    if status not in ("idle", "running", "error"):
         before = load_state(session_id)
-        return before, before, f"Invalid status: {status}\nUsage: stack_ops.py {session_id} set_status <idle|running>"
+        return before, before, f"Invalid status: {status}\nUsage: stack_ops.py {session_id} set_status <idle|running|error>"
     
     before = load_state(session_id)
     after = copy.deepcopy(before)
@@ -563,6 +633,22 @@ def op_set_output(session_id: str, args: list) -> tuple:
     return before, after, None
 
 
+def op_set_agent_id(session_id: str, args: list) -> tuple:
+    """设置 controller agent ID (用于 resume)"""
+    if not args:
+        before = load_state(session_id)
+        return before, before, f"Missing <agent_id>\nUsage: stack_ops.py {session_id} set_agent_id \"agent-uuid\""
+    
+    agent_id = args[0]
+    
+    before = load_state(session_id)
+    after = copy.deepcopy(before)
+    after["controller_agent_id"] = agent_id
+    
+    save_state(session_id, after)
+    return before, after, None
+
+
 def op_clear(session_id: str, args: list) -> tuple:
     """清空栈，重置状态"""
     before = load_state(session_id)
@@ -577,7 +663,20 @@ def op_show(session_id: str, args: list) -> tuple:
     
     print(f"\n[SHOW] session={session_id}")
     print(f"file: {get_state_file(session_id)}")
-    print(format_state_compact(state, max_frames=100))  # show 显示所有帧
+    print(f"status: {state.get('status', 'idle')}")
+    
+    # 显示 controller_agent_id（如果存在）
+    if state.get("controller_agent_id"):
+        print(f"controller_agent_id: {state['controller_agent_id']}")
+    
+    # 显示栈
+    stack = state.get("stack", [])
+    print(f"stack: [{len(stack)}]")
+    if stack:
+        for i, frame in enumerate(stack):
+            print(format_stack_frame(frame, i))
+    else:
+        print("  (empty)")
     
     if state.get("output"):
         print(f"\noutput:")
@@ -592,6 +691,14 @@ def op_tail_call(session_id: str, args: list) -> tuple:
         before = load_state(session_id)
         return before, before, f"Missing <fqn>\nUsage: stack_ops.py {session_id} tail_call <fqn> [--arg.k=v]"
     
+    # 解析新帧参数
+    function_fqn = args[0]
+    
+    # 验证函数名
+    if err := validate_function_name(function_fqn):
+        before = load_state(session_id)
+        return before, before, err
+    
     before = load_state(session_id, must_exist=True)
     
     if not before.get("stack"):
@@ -601,9 +708,6 @@ def op_tail_call(session_id: str, args: list) -> tuple:
     
     # 弹出当前帧
     after["stack"].pop()
-    
-    # 解析新帧参数
-    function_fqn = args[0]
     frame_args = {}
     step_index = None
     
@@ -809,6 +913,69 @@ def op_del_var(session_id: str, args: list) -> tuple:
     return before, after, None
 
 
+def op_assert_empty(session_id: str, args: list) -> tuple:
+    """断言栈为空（返回 complete 前必须调用）"""
+    state = load_state(session_id, must_exist=True)
+    stack = state.get("stack", [])
+    
+    print(f"\n[ASSERT_EMPTY] session={session_id}")
+    
+    if not stack:
+        print("[OK] Stack is empty (depth=0)")
+        print("Safe to return complete.")
+        sys.exit(0)
+    else:
+        print("[FAIL] Stack NOT empty!")
+        print(f"  depth: {len(stack)}")
+        print(f"  status: {state.get('status', 'idle')}")
+        print("  stack:")
+        for i, frame in enumerate(stack):
+            line = f"    [{i}] {frame.get('function', '?')}"
+            if frame.get("args"):
+                line += f" args={json.dumps(frame['args'], ensure_ascii=False)}"
+            if frame.get("prev"):
+                line += " [has prev]"
+            if frame.get("step_index") is not None:
+                line += f" step={frame['step_index']}"
+            print(line)
+        print("")
+        print("[ACTION] Do NOT return complete!")
+        print("  Continue processing the top frame's on_complete.")
+        sys.exit(1)
+
+
+def op_get_next_action(session_id: str, args: list) -> tuple:
+    """获取栈状态和下一步建议操作（JSON 输出）"""
+    state = load_state(session_id, must_exist=True)
+    stack = state.get("stack", [])
+    
+    result = {
+        "status": state.get("status", "idle"),
+        "depth": len(stack),
+        "next_action": None,
+        "top_frame": None
+    }
+    
+    if not stack:
+        result["next_action"] = "complete"
+    else:
+        result["next_action"] = "continue"
+        top = stack[-1]
+        result["top_frame"] = {
+            "function": top.get("function")
+        }
+        if top.get("args"):
+            result["top_frame"]["args"] = top["args"]
+        if top.get("step_index") is not None:
+            result["top_frame"]["step_index"] = top["step_index"]
+        if top.get("prev") is not None:
+            result["top_frame"]["has_prev"] = True
+    
+    # 输出纯 JSON
+    print(json.dumps(result, ensure_ascii=False))
+    return None, None, None
+
+
 # ============== 主入口 ==============
 
 OPERATIONS = {
@@ -819,6 +986,7 @@ OPERATIONS = {
     "update": op_update,
     "set_status": op_set_status,
     "set_output": op_set_output,
+    "set_agent_id": op_set_agent_id,
     "clear": op_clear,
     "show": op_show,
     "tail_call": op_tail_call,
@@ -827,6 +995,8 @@ OPERATIONS = {
     "set_var": op_set_var,
     "get_var": op_get_var,
     "del_var": op_del_var,
+    "assert_empty": op_assert_empty,
+    "get_next_action": op_get_next_action,
 }
 
 
@@ -836,19 +1006,43 @@ def print_help():
     print("\nAvailable operations:", ", ".join(OPERATIONS.keys()))
 
 
+def get_auto_session_id() -> str:
+    """从 WT_SESSION 环境变量自动获取 session_id"""
+    wt_session = os.environ.get("WT_SESSION", "")
+    if not wt_session:
+        print("[ERROR] Cannot auto-detect session: WT_SESSION environment variable not set")
+        print("  - In PowerShell: $env:WT_SESSION should be set by Windows Terminal")
+        print("  - In Git Bash: WT_SESSION should be inherited from parent")
+        print("")
+        print("Make sure you are running from Windows Terminal.")
+        sys.exit(1)
+    return wt_session
+
+
 def main():
     # 支持 --help / -h / help
     if len(sys.argv) < 2 or sys.argv[1] in ("--help", "-h", "help"):
         print_help()
         sys.exit(0)
     
-    if len(sys.argv) < 3:
-        print_help()
-        sys.exit(1)
+    first_arg = sys.argv[1].lower()
     
-    session_id = sys.argv[1]
-    operation = sys.argv[2].lower()
-    op_args = sys.argv[3:]
+    # 判断第一个参数是 operation 还是 session_id
+    # 如果第一个参数是已知操作，则自动检测 session_id
+    # 否则视为 session_id（支持显式传入，用于测试）
+    if first_arg in OPERATIONS:
+        # 自动检测 session_id
+        session_id = get_auto_session_id()
+        operation = first_arg
+        op_args = sys.argv[2:]
+    else:
+        # 显式 session_id（用于测试）
+        if len(sys.argv) < 3:
+            print_help()
+            sys.exit(1)
+        session_id = sys.argv[1]
+        operation = sys.argv[2].lower()
+        op_args = sys.argv[3:]
     
     if operation not in OPERATIONS:
         print(f"[ERROR] Unknown operation: {operation}")
@@ -859,8 +1053,8 @@ def main():
     op_func = OPERATIONS[operation]
     before, after, error = op_func(session_id, op_args)
     
-    # peek, show, get_var 自己处理输出
-    if operation in ("peek", "show", "get_var") and before is None:
+    # peek, show, get_var, assert_empty, get_next_action 自己处理输出
+    if operation in ("peek", "show", "get_var", "assert_empty", "get_next_action") and before is None:
         sys.exit(0 if error is None else 1)
     
     # 打印结果

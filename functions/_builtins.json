@@ -1,20 +1,64 @@
 {
-  "_comment": "内置 function 定义，这些 function 直接映射到 Claude Code 指令",
+  "_comment": "内置 function 定义，这些 function 直接映射到 Claude Code 指令或框架操作",
   "builtins": {
     "_compact": {
       "description": "执行上下文压缩",
       "action": "/compact",
-      "note": "对应 Claude Code 的上下文压缩功能"
+      "implementation": "subagent_isolation",
+      "status": "designed_not_implemented",
+      "note": "对应 Claude Code 的上下文压缩功能。实现方案：利用 subagent 独立上下文 + auto-compaction"
     },
     "_clear": {
       "description": "清理上下文",
       "action": "/clear",
-      "note": "对应 Claude Code 的上下文清理功能"
+      "implementation": "new_session",
+      "status": "designed_not_implemented",
+      "note": "对应 Claude Code 的上下文清理功能。实现方案：新会话 + 栈状态持久化"
     },
     "_return": {
       "description": "结束当前 function 调用链，返回结果",
-      "action": "terminate",
-      "note": "标记当前 function 执行完成"
+      "action": "stack_pop",
+      "status": "implemented",
+      "note": "标记当前 function 执行完成，弹出栈顶"
+    }
+  },
+  "execute_in_options": {
+    "_comment": "task.execute_in 字段的可选值",
+    "main": {
+      "description": "在主会话中执行（默认）",
+      "context": "主会话上下文"
+    },
+    "subagent": {
+      "description": "在临时 subagent 中执行，使用默认模型",
+      "context": "独立上下文，执行后销毁"
+    },
+    "subagent@haiku": {
+      "description": "在临时 subagent 中执行，使用 haiku 模型",
+      "context": "独立上下文，快速低成本"
+    },
+    "subagent@sonnet": {
+      "description": "在临时 subagent 中执行，使用 sonnet 模型",
+      "context": "独立上下文，平衡性能"
+    },
+    "subagent@opus": {
+      "description": "在临时 subagent 中执行，使用 opus 模型",
+      "context": "独立上下文，最高能力"
+    }
+  },
+  "subagents": {
+    "_comment": "框架使用的 subagent 定义",
+    "fn-controller": {
+      "description": "函数执行控制器，管理栈操作、函数分发、控制流",
+      "location": ".claude/agents/fn-controller.md",
+      "model": "haiku",
+      "resumable": true
+    },
+    "task-executor": {
+      "description": "临时任务执行器，用于 execute_in: subagent 的任务",
+      "location": "dynamic (无 .md 文件，由主会话动态创建)",
+      "model": "由 execute_in 指定: subagent=inherit, subagent@haiku, subagent@sonnet, subagent@opus",
+      "resumable": false,
+      "creation": "主会话直接使用 Task 工具创建临时 subagent，传入 task.prompt 和 task.tools"
     }
   }
 }

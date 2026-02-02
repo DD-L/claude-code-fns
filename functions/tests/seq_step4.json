@@ -1,0 +1,11 @@
+{
+  "name": "seq_step4",
+  "description": "序列步骤4 - 最终验证步骤（用于测试4步sequence不跳步）",
+  "params": ["data"],
+  "task": "Bash(echo \"[seq_step4] VERIFY: $data -> FINAL_$data\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "return",
+    "output": "FINAL_$data"
+  }
+}

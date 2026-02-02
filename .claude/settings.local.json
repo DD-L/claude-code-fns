@@ -6,8 +6,11 @@
       "Bash(echo:*)",
       "Bash(test:*)",
       "Bash(python scripts/resolve_fn.py:*)",
-      "Bash(.scripts/stack_ops.ps1)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(ls -la scripts/state*.json)",
+      "Bash(ls -la scripts/states/*.json)",
+      "Bash(ls \"C:/Users/LiNan/.claude/projects/G--gpt-cc-function\"/*.jsonl)",
+      "Bash(ls -lt *.jsonl)"
     ]
   },
   "hooks": {

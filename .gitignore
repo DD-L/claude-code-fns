@@ -138,3 +138,6 @@ Thumbs.db
 
 # Project specific
 test_data/__pycache__
+
+scripts/states/*.json
+scripts/states/*.log

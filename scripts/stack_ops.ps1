@@ -12,16 +12,19 @@
   pop           [-Output <value>]                      Pop top frame
   tail_call     <fqn> [-ArgList k=v,...]               Tail call (pop+push, depth unchanged)
   return        [-Value <v>]                           Return (pop + set prev + output)
-  update        [-StepIndex n] [-Prev v] [-VarList k=v] Update top frame properties
+  update        [-StepIndex n] [-Prev v] [-VarList k=v] [-ForceStepIndex] Update top frame
   peek                                                 View top frame
   show                                                 Show full state
   init                                                 Initialize/reset state
   clear                                                Clear stack and output
-  set_status    idle|running                           Set status
+  set_status    idle|running|error                     Set status
   set_output    <value>                                Set session output
+  set_agent_id  <agent_id>                             Set controller agent ID (for resume)
   set_var       [-VarList k=v,...]                     Batch set temp variables
   get_var       [-Key <key>]                           Read variable (args/prev/vars)
   del_var       [-Keys k1,k2,...]                      Batch delete temp variables
+  assert_empty                                         Assert stack is empty (for complete)
+  get_next_action                                      Get stack state + suggested next action (JSON)
 ================================================================================
 
 .EXAMPLE
@@ -36,16 +39,17 @@
 
 param(
     [Parameter(Position=0)]
-    [string]$Session,
-    
-    [Parameter(Position=1)]
-    [ValidateSet("init","push","call","pop","peek","update","set_status","set_output","clear","show","tail_call","return","set_var","get_var","del_var")]
+    [ValidateSet("init","push","call","pop","peek","update","set_status","set_output","set_agent_id","clear","show","tail_call","return","set_var","get_var","del_var","assert_empty","get_next_action")]
     [string]$Op,
     
-    [Parameter(Position=2)]
+    [Parameter(Position=1)]
     [string]$Fn,           # 函数名 (push/tail_call)
     
+    [string]$Session,      # 可选：手动指定 session_id（默认自动从 $env:WT_SESSION 获取）
+    
     [int]$StepIndex = -1,  # step_index (push/update)
+    
+    [switch]$ForceStepIndex,  # 强制更新 step_index（跳过连续性验证）
     
     [string]$Output,       # output (pop/update)
     
@@ -81,53 +85,64 @@ function Show-Help {
   pop           [-Output <value>]                      Pop top frame
   tail_call     <fqn> [-ArgList k=v,...]               Tail call (pop+push, depth unchanged)
   return        [-Value <v>]                           Return (pop + set prev + output)
-  update        [-StepIndex n] [-Prev v] [-VarList k=v] Update top frame properties
+  update        [-StepIndex n] [-Prev v] [-VarList k=v] [-ForceStepIndex] Update top frame
   peek                                                 View top frame
   show                                                 Show full state
   init                                                 Initialize/reset state
   clear                                                Clear stack and output
-  set_status    idle|running                           Set status
+  set_status    idle|running|error                     Set status
   set_output    <value>                                Set session output
+  set_agent_id  <agent_id>                             Set controller agent ID (for resume)
   set_var       [-VarList k=v,...]                     Batch set temp variables
   get_var       [-Key <key>]                           Read variable (args/prev/vars)
   del_var       [-Keys k1,k2,...]                      Batch delete temp variables
+  assert_empty                                         Assert stack is empty (exit 1 if not)
+  get_next_action                                      Get stack state + suggested next action (JSON)
 ================================================================================
 
 Usage:
-    .\stack_ops.ps1 -Session <id> -Op <operation> [options]
+    .\stack_ops.ps1 -Op <operation> [options]               # auto-detect session
+    .\stack_ops.ps1 -Session <id> -Op <operation> [options] # explicit session (for testing)
     .\stack_ops.ps1 -Help
 
+Session ID is auto-detected from $env:WT_SESSION (set by Windows Terminal).
+
 Examples:
-    .\stack_ops.ps1 -Session abc -Op push -Fn route_a -ArgList "n=5,from=main"
-    .\stack_ops.ps1 -Session abc -Op tail_call -Fn route_b -ArgList "n=4"
-    .\stack_ops.ps1 -Session abc -Op return -Value "completed"
-    .\stack_ops.ps1 -Session abc -Op show
+    .\stack_ops.ps1 -Op show
+    .\stack_ops.ps1 -Op push -Fn route_a -ArgList "n=5,from=main"
+    .\stack_ops.ps1 -Op tail_call -Fn route_b -ArgList "n=4"
+    .\stack_ops.ps1 -Op return -Value "completed"
 
 Output:
     BEFORE/AFTER summary + detailed DIFF for reviewing operation results
 
-Available operations: init, push, call, pop, peek, update, set_status, set_output, clear, show, tail_call, return, set_var, get_var, del_var
+Available operations: init, push, call, pop, peek, update, set_status, set_output, set_agent_id, clear, show, tail_call, return, set_var, get_var, del_var, assert_empty
 "@
     Write-Host $helpText
 }
 
 # 无参数或 -Help 时显示帮助
-if ($Help -or (-not $Session -and -not $Op)) {
+if ($Help -or -not $Op) {
     Show-Help
     exit 0
 }
 
-# 检查必须参数
-if (-not $Session) {
-    Write-Host "[ERROR] Missing required parameter: -Session"
-    Write-Host "Run with -Help to see usage."
-    exit 1
+# 自动检测 Session ID
+function Get-AutoSessionId {
+    $wtSession = $env:WT_SESSION
+    if (-not $wtSession) {
+        Write-Host "[ERROR] Cannot auto-detect session: WT_SESSION environment variable not set"
+        Write-Host "  - `$env:WT_SESSION should be set by Windows Terminal"
+        Write-Host ""
+        Write-Host "Make sure you are running from Windows Terminal."
+        exit 1
+    }
+    return $wtSession
 }
 
-if (-not $Op) {
-    Write-Host "[ERROR] Missing required parameter: -Op"
-    Write-Host "Run with -Help to see usage."
-    exit 1
+# 如果没有提供 Session，自动获取
+if (-not $Session) {
+    $Session = Get-AutoSessionId
 }
 
 # 解析 "n=5,from=main" 格式的参数列表
@@ -209,6 +224,14 @@ function Save-State {
     # Ensure depth consistency before save
     $stackLen = if ($State.stack) { @($State.stack).Count } else { 0 }
     
+    # Update last_updated timestamp
+    $timestamp = Get-Date -Format "o"  # ISO8601 format
+    if ($State.PSObject.Properties["last_updated"]) {
+        $State.last_updated = $timestamp
+    } else {
+        $State | Add-Member -NotePropertyName "last_updated" -NotePropertyValue $timestamp -Force
+    }
+    
     # Atomic write
     $State | ConvertTo-Json -Depth 10 | Set-Content $file -Encoding UTF8
     
@@ -265,6 +288,7 @@ function Format-StateSummary {
         }
     }
     
+    if ($State.controller_agent_id) { $parts += "[has_agent_id]" }
     if ($State.output) { $parts += "[has_output]" }
     
     return $parts -join " | "
@@ -386,6 +410,18 @@ function Compute-Diff {
         }
     }
     
+    # controller_agent_id 变化
+    if ($Before.controller_agent_id -ne $After.controller_agent_id) {
+        if (-not $Before.controller_agent_id -and $After.controller_agent_id) {
+            $agentIdPreview = if ($After.controller_agent_id.Length -gt 20) { $After.controller_agent_id.Substring(0, 20) + "..." } else { $After.controller_agent_id }
+            $diff += "+ controller_agent_id: $agentIdPreview"
+        } elseif ($Before.controller_agent_id -and -not $After.controller_agent_id) {
+            $diff += "- controller_agent_id: cleared"
+        } else {
+            $diff += "~ controller_agent_id: changed"
+        }
+    }
+    
     return $diff
 }
 
@@ -404,7 +440,8 @@ function Print-Result {
     if ($Error) {
         Write-Host "[ERROR] $Error"
         Write-Host "STATE: $(Format-StateSummary $Before)"
-        exit 1
+        $script:OperationFailed = $true
+        return
     }
     
     Write-Host "BEFORE: $(Format-StateSummary $Before)"
@@ -563,6 +600,15 @@ function Op-Return {
 }
 
 function Op-Update {
+    <#
+    .DESCRIPTION
+    更新栈顶帧：支持 step_index, prev, output, args, vars
+    
+    step_index 更新规则（防止 sequence 跳步 bug）：
+    - 必须连续递增：new_step_index == current_step_index + 1
+    - 或者初始设置：current_step_index 不存在 且 new_step_index == 0 或 1
+    - 使用 -ForceStepIndex 可跳过验证（仅用于测试/恢复）
+    #>
     $before = Load-State $Session -MustExist $true
     
     if (-not $before.stack -or $before.stack.Count -eq 0) {
@@ -575,6 +621,31 @@ function Op-Update {
     $topFrame = $after.stack[$idx]
     
     if ($StepIndex -ge 0) {
+        # step_index 连续性验证（防止 sequence 跳步 bug）
+        $currentStepIndex = $topFrame.step_index
+        
+        if (-not $ForceStepIndex) {
+            if ($null -eq $currentStepIndex) {
+                # First time setting step_index
+                if ($StepIndex -ne 0 -and $StepIndex -ne 1) {
+                    # Allow 0 (initial) or 1 (first update)
+                    Write-Host "[WARN] step_index first set to $StepIndex, expected 0 or 1" -ForegroundColor Yellow
+                }
+            } else {
+                # Already has step_index, must increment continuously
+                $expected = $currentStepIndex + 1
+                if ($StepIndex -ne $expected) {
+                    $errMsg = @"
+step_index not continuous! current=$currentStepIndex, new=$StepIndex, expected=$expected
+This may cause sequence to skip steps!
+Use -ForceStepIndex to bypass validation
+"@
+                    Print-Result "update" $Session $before $before $errMsg
+                    return
+                }
+            }
+        }
+        
         $topFrame | Add-Member -NotePropertyName "step_index" -NotePropertyValue $StepIndex -Force
     }
     if ($Output) {
@@ -639,8 +710,25 @@ function Op-Show {
     Write-Host "file: $file"
     Write-Host "status: $($state.status)"
     
-    $stack = if ($state.stack) { @($state.stack) } else { @() }
-    Write-Host "stack: [$($stack.Count)]"
+    # 显示 controller_agent_id（如果存在）
+    if ($state.controller_agent_id) {
+        Write-Host "controller_agent_id: $($state.controller_agent_id)"
+    }
+    
+    # 安全获取栈数组和计数（处理 PowerShell 的数组解包问题）
+    $stackCount = 0
+    $stack = @()
+    if ($null -ne $state.stack) {
+        if ($state.stack -is [array]) {
+            $stack = $state.stack
+            $stackCount = $state.stack.Count
+        } else {
+            # 单元素被 JSON 反序列化为对象而非数组
+            $stack = @($state.stack)
+            $stackCount = 1
+        }
+    }
+    Write-Host "stack: [$stackCount]"
     
     if ($stack.Count -eq 0) {
         Write-Host "  (empty)"
@@ -684,9 +772,9 @@ function Op-Clear {
 function Op-SetStatus {
     $statusVal = if ($Status) { $Status } elseif ($Value) { $Value } else { $null }
     
-    if (-not $statusVal -or $statusVal -notin @("idle", "running")) {
+    if (-not $statusVal -or $statusVal -notin @("idle", "running", "error")) {
         $before = Load-State $Session
-        $errMsg = "Missing or invalid -Value <idle|running>`nUsage: stack_ops.ps1 -Session $Session -Op set_status -Value idle"
+        $errMsg = "Missing or invalid -Value <idle|running|error>`nUsage: stack_ops.ps1 -Session $Session -Op set_status -Value idle"
         Print-Result "set_status" $Session $before $before $errMsg
         return
     }
@@ -697,6 +785,28 @@ function Op-SetStatus {
     
     Save-State $Session $after
     Print-Result "set_status" $Session $before $after
+}
+
+function Op-SetAgentId {
+    if (-not $Value) {
+        $before = Load-State $Session
+        $errMsg = "Missing -Value <agent_id>`nUsage: stack_ops.ps1 -Session $Session -Op set_agent_id -Value `"agent-uuid`""
+        Print-Result "set_agent_id" $Session $before $before $errMsg
+        return
+    }
+    
+    $before = Load-State $Session
+    $after = Clone-State $before
+    
+    # 添加或更新 controller_agent_id 字段
+    if ($after.PSObject.Properties["controller_agent_id"]) {
+        $after.controller_agent_id = $Value
+    } else {
+        $after | Add-Member -NotePropertyName "controller_agent_id" -NotePropertyValue $Value -Force
+    }
+    
+    Save-State $Session $after
+    Print-Result "set_agent_id" $Session $before $after
 }
 
 function Op-SetOutput {
@@ -895,23 +1005,108 @@ function Op-DelVar {
     Print-Result "del_var" $Session $before $after
 }
 
+function Op-AssertEmpty {
+    $state = Load-State $Session -MustExist $true
+    $stackLen = if ($state.stack) { @($state.stack).Count } else { 0 }
+    
+    Write-Host ""
+    Write-Host "[ASSERT_EMPTY] session=$Session"
+    
+    if ($stackLen -eq 0) {
+        Write-Host "[OK] Stack is empty (depth=0)"
+        Write-Host "Safe to return complete."
+        exit 0
+    } else {
+        Write-Host "[FAIL] Stack NOT empty!"
+        Write-Host "  depth: $stackLen"
+        Write-Host "  status: $($state.status)"
+        
+        # 显示栈内容
+        Write-Host "  stack:"
+        for ($i = 0; $i -lt $state.stack.Count; $i++) {
+            $frame = $state.stack[$i]
+            $line = "    [$i] $($frame.function)"
+            if ($frame.args) {
+                $argsStr = ($frame.args | ConvertTo-Json -Compress)
+                $line += " args=$argsStr"
+            }
+            if ($frame.prev) {
+                $line += " [has prev]"
+            }
+            if ($null -ne $frame.step_index) {
+                $line += " step=$($frame.step_index)"
+            }
+            Write-Host $line
+        }
+        
+        Write-Host ""
+        Write-Host "[ACTION] Do NOT return complete!"
+        Write-Host "  Continue processing the top frame's on_complete."
+        exit 1
+    }
+}
+
+function Op-GetNextAction {
+    $state = Load-State $Session -MustExist $true
+    $stackLen = if ($state.stack) { @($state.stack).Count } else { 0 }
+    
+    # 构建结果对象
+    $result = @{
+        status = if ($state.status) { $state.status } else { "idle" }
+        depth = $stackLen
+        next_action = $null
+        top_frame = $null
+    }
+    
+    if ($stackLen -eq 0) {
+        $result.next_action = "complete"
+    } else {
+        $result.next_action = "continue"
+        $idx = $state.stack.Count - 1
+        $top = $state.stack[$idx]
+        $result.top_frame = @{
+            function = $top.function
+        }
+        if ($top.args) { $result.top_frame.args = $top.args }
+        if ($null -ne $top.step_index) { $result.top_frame.step_index = $top.step_index }
+        if ($top.prev) { $result.top_frame.has_prev = $true }
+    }
+    
+    # 输出纯 JSON
+    $result | ConvertTo-Json -Compress
+}
+
 # ============== 主入口 ==============
 
+# Track if operation succeeded (for exit code)
+$script:OperationFailed = $false
+
 switch ($Op) {
-    "init"       { Op-Init }
-    "push"       { Op-Push }
-    "call"       { Op-Push }
-    "pop"        { Op-Pop }
-    "tail_call"  { Op-TailCall }
-    "return"     { Op-Return }
-    "update"     { Op-Update }
-    "peek"       { Op-Peek }
-    "show"       { Op-Show }
-    "clear"      { Op-Clear }
-    "set_status" { Op-SetStatus }
-    "set_output" { Op-SetOutput }
-    "set_var"    { Op-SetVar }
-    "get_var"    { Op-GetVar }
-    "del_var"    { Op-DelVar }
-    default      { Write-Host "[ERROR] Unknown operation: $Op"; exit 1 }
+    "init"         { Op-Init }
+    "push"         { Op-Push }
+    "call"         { Op-Push }
+    "pop"          { Op-Pop }
+    "tail_call"    { Op-TailCall }
+    "return"       { Op-Return }
+    "update"       { Op-Update }
+    "peek"         { Op-Peek }
+    "show"         { Op-Show }
+    "clear"        { Op-Clear }
+    "set_status"   { Op-SetStatus }
+    "set_output"   { Op-SetOutput }
+    "set_agent_id" { Op-SetAgentId }
+    "set_var"      { Op-SetVar }
+    "get_var"      { Op-GetVar }
+    "del_var"      { Op-DelVar }
+    "assert_empty" { Op-AssertEmpty }
+    "get_next_action" { Op-GetNextAction }
+    default        { Write-Host "[ERROR] Unknown operation: $Op"; exit 1 }
+}
+
+# Exit with appropriate code (0 = success, 1 = failure)
+# Note: Some operations (like assert_empty) exit directly
+if ($script:OperationFailed) {
+    exit 1
+} else {
+    exit 0
 }

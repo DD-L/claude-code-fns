@@ -14,14 +14,21 @@
 4) stop hook：在“栈非空”时是否阻止 stop；是否有“用户强制停止/覆盖 hook”的证据；提示信息是否足够定位（栈顶函数/参数/深度）
 5) 工具调用健康度：Invalid tool parameters、Error writing file 等重试是否频繁；是否导致耗时异常；是否存在可避免的反复读写
 6) 性能/可用性：耗时是否合理；慢的根因（重试、状态写入频率、指令过长/不确定性）与可落地优化点
-7) 其它你发现的问题
+7) 执行是否符合定义的 functions/* 控制流和工作流；未按函数定义预期，提前终止；流程未完但栈已经清空等等情况
+8) 其它你发现的问题
 
 ### 重要补充信息，必须查看
 - fn 和 fn_continue 在 `.claude/commands/*` 目录
 - 函数定义在 `functions/` 目录
 - 脚本定义在 `scripts/` 目录
+- `fn-controller` subagent 定义在 `.claude/agents/*` 目录
 - hook 运行日志在 `scripts/states/.hook_debug.log` 中
 - 会话栈信息在 `scripts/states/$SessionID.json` 中
+- 必须完整阅读 C:\Users\LiNan\.claude\projects\G--gpt-cc-function\<claudecode_session_id>.jsonl 这里面是执行过程的完整信息
+  - <claudecode_session_id> 与 $SessionID.json 中 $SessionID 不同，前者是 claudecode 的 session_id， 后者是 WT_SESSION
+  - 交互式命令 `/status` 可以看到当前 case 的  claudecode 的 session_id ：<claudecode_session_id> , 输入中一般都会提供，注意提取 它 去到  C:\Users\LiNan\.claude\projects\G--gpt-cc-function\ 路径查看对应 jsonl 文件
+  - 总结里面的失败经验
+- 如果输入中包含自检信息，这些自检信息仅供参考，还是以你的分析结论为主
 
 ### 输出格式（必须严格按此结构）
 ## 总览
