@@ -24,7 +24,36 @@ import argparse
 
 def get_session_id() -> str:
     """Get WT_SESSION from environment (same as PowerShell $env:WT_SESSION)."""
-    return os.environ.get("WT_SESSION", "")
+    sid = os.environ.get("WT_SESSION", "")
+    if not sid:
+        # In Git Bash, try to get stable ID based on parent process
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", "(Get-Process -Id $PID).Parent.Id"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            parent_pid = result.stdout.strip()
+            # Try to get WT_SESSION from parent process via PowerShell
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", f"Get-CimInstance Win32_Process -Filter \"Handle='{parent_pid}'\" | Select-Object -ExpandProperty CommandLine"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            cmdline = result.stdout
+            # Parse Windows Terminal session ID from command line
+            # Format: wt.exe -p ... ; new-tab ... ; split-pane ... ; --wsId <id> ...
+            if "--wsId" in cmdline:
+                parts = cmdline.split("--wsId")
+                if len(parts) > 1:
+                    wsid = parts[1].strip().split()[0].strip(" '\"")
+                    sid = wsid
+        except Exception:
+            pass
+    return sid
 
 
 def main() -> None:

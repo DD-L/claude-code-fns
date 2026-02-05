@@ -10,7 +10,9 @@
       "Bash(ls -la scripts/state*.json)",
       "Bash(ls -la scripts/states/*.json)",
       "Bash(ls \"C:/Users/LiNan/.claude/projects/G--gpt-cc-function\"/*.jsonl)",
-      "Bash(ls -lt *.jsonl)"
+      "Bash(ls -lt *.jsonl)",
+      "Bash(bash scripts/wait_for_status.sh)",
+      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/interactive_test.py)"
     ]
   },
   "hooks": {
