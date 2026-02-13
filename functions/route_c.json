@@ -6,23 +6,20 @@
   "tools": ["Bash"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$n <= 0",
-        "call": "_return"
+        "case": "$n <= 0",
+        "then": {"type": "return"}
       },
       {
-        "when": "$from == 'A'",
-        "tail_call": "route_b",
-        "args": {"n": "$n - 1", "from": "C"}
+        "case": "$from == 'A'",
+        "then": {"tail_call": "route_b", "args": {"n": "$n - 1", "from": "C"}}
       },
       {
-        "when": "$from == 'B'",
-        "tail_call": "route_a",
-        "args": {"n": "$n - 2"}
+        "case": "$from == 'B'",
+        "then": {"tail_call": "route_a", "args": {"n": "$n - 2"}}
       }
     ],
-    "default": "route_a",
-    "default_args": {"n": "$n - 1"}
+    "default": {"tail_call": "route_a", "args": {"n": "$n - 1"}}
   }
 }

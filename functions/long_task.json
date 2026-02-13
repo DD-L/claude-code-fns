@@ -6,17 +6,16 @@
   "tools": ["Bash"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$n >= $total",
-        "type": "return"
+        "case": "$n >= $total",
+        "then": {"type": "return"}
       },
       {
-        "when": "$n < $total",
-        "tail_call": "long_task",
-        "args": {"n": "$n + 1", "total": "$total"}
+        "case": "$n < $total",
+        "then": {"tail_call": "long_task", "args": {"n": "$n + 1", "total": "$total"}}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

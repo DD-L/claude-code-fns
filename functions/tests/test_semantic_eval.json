@@ -1,0 +1,21 @@
+{
+  "name": "test_semantic_eval",
+  "description": "Test semantic evaluation - conditions need AI judgment",
+  "params": ["input"],
+  "task": "Bash(echo \"[test_semantic_eval] input=$input\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "switch",
+    "cases": [
+      {
+        "case": "$input indicates success",
+        "then": {"type": "return", "value": "success_branch"}
+      },
+      {
+        "case": "$input indicates failure",
+        "then": {"type": "return", "value": "failure_branch"}
+      }
+    ],
+    "default": {"type": "return", "value": "default_branch"}
+  }
+}

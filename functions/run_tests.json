@@ -6,17 +6,16 @@
   "tools": ["Bash", "Read"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "test_passed == false",
-        "call": "fix_issues",
-        "args": {"target": "$target", "issues": "$failures"}
+        "case": "test_passed == false",
+        "then": {"call": "fix_issues", "args": {"target": "$target", "issues": "$failures"}}
       },
       {
-        "when": "test_passed == true",
-        "type": "return"
+        "case": "test_passed == true",
+        "then": {"type": "return"}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

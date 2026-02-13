@@ -1,0 +1,8 @@
+{
+  "name": "trigger_cleanup",
+  "description": "触发器：清理资源",
+  "params": ["msg"],
+  "task": "Bash(echo \"[trigger_cleanup] $msg\")",
+  "tools": ["Bash"],
+  "on_complete": {"type": "return", "value": "cleanup_done"}
+}

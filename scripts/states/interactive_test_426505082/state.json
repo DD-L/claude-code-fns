@@ -1,0 +1,17 @@
+{
+  "status": "running",
+  "stack": [
+    {
+      "function": "grow",
+      "args": {
+        "n": 3
+      },
+      "step_index": 0
+    }
+  ],
+  "output": null,
+  "controller": {
+    "resume_count": 1,
+    "max_resume_before_refresh": 5
+  }
+}

@@ -46,7 +46,7 @@ if [ -z "$WT_SESSION" ]; then
     exit 0
 fi
 
-STATE_FILE="$STATES_DIR/$WT_SESSION.json"
+STATE_FILE="$STATES_DIR/$WT_SESSION/state.json"
 echo "[$TIMESTAMP] Checking state file: $STATE_FILE" >> "$LOG_FILE"
 
 if [ ! -f "$STATE_FILE" ]; then

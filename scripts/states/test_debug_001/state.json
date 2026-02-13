@@ -1,0 +1,18 @@
+{
+  "status": "running",
+  "stack": [
+    {
+      "function": "tests/test_loop",
+      "args": {
+        "count": 0,
+        "max": 3
+      },
+      "step_index": 0
+    }
+  ],
+  "output": null,
+  "controller": {
+    "resume_count": 1,
+    "max_resume_before_refresh": 5
+  }
+}

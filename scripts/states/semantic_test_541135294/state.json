@@ -1,0 +1,17 @@
+{
+  "status": "running",
+  "stack": [
+    {
+      "function": "tests/test_semantic_eval",
+      "args": {
+        "input": "all tests passed"
+      },
+      "step_index": 0
+    }
+  ],
+  "output": null,
+  "controller": {
+    "resume_count": 1,
+    "max_resume_before_refresh": 5
+  }
+}

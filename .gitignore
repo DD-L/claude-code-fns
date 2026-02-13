@@ -141,3 +141,6 @@ test_data/__pycache__
 
 scripts/states/*.json
 scripts/states/*.log
+
+
+scripts/states/*

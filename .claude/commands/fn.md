@@ -8,13 +8,13 @@
 ## 架构概览
 
 ```
-主会话 (仅负责解析参数和 task 执行)
+主会话 (解析参数 + 执行 task)
     │
-    ├─→ fn-controller subagent (session 获取、栈操作、函数解析、控制流)
-    │       ↓ 返回 task 定义
-    ├─→ 执行 task (主会话或 task-executor subagent)
+    ├─→ fn-controller subagent (start <function> args...)
+    │       ↓ 返回 [TASK]
+    ├─→ 执行 task (主会话或 subagent)
     │       ↓ 执行完成
-    └─→ 新建 fn-controller (operation=continue) → 循环直到栈空
+    └─→ fn-controller (continue task_result=...) → 循环直到 [COMPLETE]
 ```
 
 ## 执行流程
@@ -23,59 +23,57 @@
 
 ```
 /fn route_a --n=3 --from=A
-→ function_name: "route_a"
-→ args: {n: "3", from: "A"}
+→ function: "route_a", args: n=3 from=A
 ```
 
 ### 阶段 2: 调用 fn-controller subagent
 
 ```
-使用 fn-controller subagent：
-  operation=start, function=route_a, args={n:"3", from:"A"}
+Task(subagent_type='fn-controller', prompt='start route_a n=3 from=A')
 ```
 
-**返回 JSON**：
-```json
-{"action": "execute_task", "task": {"prompt": "...", "tools": [...], "execute_in": "main"}}
+**返回格式**：
+```
+[TASK]
+prompt: Execute: Bash(...)
+execute_in: main
+resume_next: true
 ```
 
 ### 阶段 3: 执行 Task
 
-根据 `execute_in` 字段决定执行位置：
+根据 `execute_in` 决定执行位置：
 
 | execute_in | 执行方式 |
 |------------|---------|
-| `main` (默认) | 主会话直接执行 task.prompt，使用 task.tools |
-| `subagent` | 调用临时 subagent 执行，使用默认模型 |
-| `subagent@haiku` | 调用临时 subagent 执行，使用 haiku |
-| `subagent@sonnet` | 调用临时 subagent 执行，使用 sonnet |
-| `subagent@opus` | 调用临时 subagent 执行，使用 opus |
+| `main` (默认) | 主会话直接执行 prompt |
+| `subagent` | 调用临时 subagent 执行 |
+| `subagent@<model>` | 指定模型执行 |
 
-### 阶段 4: 继续执行（每次新建 subagent）
+### 阶段 4: 继续执行
 
-1. **调用 fn-controller**（每次都新建，不依赖 resume）
-   ```
-   使用 fn-controller subagent：
-     operation=continue, task_result="[test_sequence] input=hello"
-   ```
+根据 `resume_next` 决定复用策略：
+```
+resume_next=true  → Task(resume=<agent_id>, prompt='continue task_result=...')
+resume_next=false → Task(subagent_type='fn-controller', prompt='continue task_result=...')
+```
 
-2. **循环阶段 3-4** 直到返回 `action: "complete"`
+循环阶段 3-4 直到返回 `[COMPLETE]`
 
 ### 阶段 5: 完成
 
-当 fn-controller 返回 `action: "complete"` 时：
-- 输出最终结果
+收到 `[COMPLETE]` 时输出 result 字段内容。
 
 ## ❗关键规则
 
-1. **每次新建 subagent**：不依赖 resume，通过 state.json 保持状态
-2. **主会话职责**：仅负责解析参数 + 执行 task
-3. **stop-hook**：栈非空时强制继续
+1. **resume_next 混合方案**：根据返回值决定复用或新建 subagent
+2. **主会话职责**：解析参数 + 执行 task + 管理 agent_id
+3. **状态持久化**：通过 state.json 保持栈状态
 
 ## 错误处理
 
-| 错误类型 | 处理 |
-|---------|------|
-| fn-controller 返回 error | 输出错误，用 `/fn_continue` 恢复 |
+| 输出 | 处理 |
+|-----|------|
+| `[ERROR]` | 输出错误，用 `/fn_continue` 恢复 |
 
 $ARGUMENTS

@@ -17,6 +17,78 @@
         "_compact"
       ],
       "pattern": "^(_[a-z]+|[.]{1,2}/)?[a-zA-Z0-9_/]+$"
+    },
+    "action": {
+      "type": "object",
+      "description": "动作定义（用于 switch case 的 then 和 default）",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["return"],
+          "description": "返回动作"
+        },
+        "value": {
+          "description": "返回值（type=return 时使用）"
+        },
+        "call": {
+          "$ref": "#/definitions/function_ref",
+          "description": "调用函数（返回后继续）"
+        },
+        "tail_call": {
+          "$ref": "#/definitions/function_ref",
+          "description": "尾调用函数（不返回）"
+        },
+        "args": {
+          "type": "object",
+          "description": "传递给函数的参数"
+        }
+      }
+    },
+    "case_item": {
+      "type": "object",
+      "description": "switch 分支项（新语法）",
+      "properties": {
+        "case": {
+          "type": "string",
+          "description": "条件表达式"
+        },
+        "then": {
+          "$ref": "#/definitions/action",
+          "description": "条件为真时执行的动作"
+        },
+        "default": {
+          "$ref": "#/definitions/action",
+          "description": "默认动作（无需 case 条件）"
+        }
+      }
+    },
+    "condition_item": {
+      "type": "object",
+      "description": "switch 条件项（旧语法，已废弃）",
+      "properties": {
+        "when": {"type": "string", "description": "条件表达式"},
+        "type": {"type": "string", "enum": ["return"]},
+        "call": {"$ref": "#/definitions/function_ref"},
+        "tail_call": {"$ref": "#/definitions/function_ref"},
+        "args": {"type": "object"}
+      },
+      "required": ["when"],
+      "deprecated": true
+    },
+    "trigger_rule": {
+      "type": "object",
+      "description": "triggers 规则项（NFA 多分支语义）",
+      "properties": {
+        "when": {
+          "type": "string",
+          "description": "触发条件（可以是语义表达式）"
+        },
+        "do": {
+          "$ref": "#/definitions/action",
+          "description": "条件为真时执行的动作"
+        }
+      },
+      "required": ["when", "do"]
     }
   },
   "properties": {
@@ -75,7 +147,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["return", "call", "tail_call", "switch", "sequence", "loop"],
+          "enum": ["return", "call", "tail_call", "switch", "triggers", "sequence", "loop"],
           "description": "动作类型"
         },
         "target": {
@@ -86,28 +158,34 @@
           "type": "object",
           "description": "传递给目标的参数"
         },
-        "conditions": {
+        "value": {
+          "description": "返回值（type=return 时使用）"
+        },
+        "cases": {
           "type": "array",
-          "description": "条件分支列表（switch 使用）",
+          "description": "条件分支列表（switch 新语法：case/then/default）",
           "items": {
-            "type": "object",
-            "properties": {
-              "when": {"type": "string", "description": "条件表达式"},
-              "type": {"type": "string", "enum": ["return"]},
-              "call": {"$ref": "#/definitions/function_ref"},
-              "tail_call": {"$ref": "#/definitions/function_ref"},
-              "args": {"type": "object"}
-            },
-            "required": ["when"]
+            "$ref": "#/definitions/case_item"
           }
         },
+        "conditions": {
+          "type": "array",
+          "description": "条件分支列表（switch 旧语法，已废弃，请使用 cases）",
+          "items": {
+            "$ref": "#/definitions/condition_item"
+          },
+          "deprecated": true
+        },
         "default": {
-          "$ref": "#/definitions/function_ref",
-          "description": "默认动作: _return 或函数引用"
+          "oneOf": [
+            {"$ref": "#/definitions/function_ref"},
+            {"$ref": "#/definitions/action"}
+          ],
+          "description": "默认动作: _return、函数引用或 action 对象"
         },
         "default_args": {
           "type": "object",
-          "description": "默认动作的参数"
+          "description": "默认动作的参数（与 default 为函数引用时配合使用）"
         },
         "steps": {
           "type": "array",
@@ -139,6 +217,17 @@
           "type": "number",
           "description": "最大循环次数",
           "default": 1000
+        },
+        "rules": {
+          "type": "array",
+          "description": "触发器规则列表（triggers 使用，NFA 语义：所有匹配的规则都执行）",
+          "items": {
+            "$ref": "#/definitions/trigger_rule"
+          }
+        },
+        "on_none": {
+          "$ref": "#/definitions/action",
+          "description": "无规则匹配时的动作（triggers 使用）"
         }
       }
     }

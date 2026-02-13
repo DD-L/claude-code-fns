@@ -6,17 +6,16 @@
   "tools": ["Bash"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$n <= 0",
-        "type": "return"
+        "case": "$n <= 0",
+        "then": {"type": "return"}
       },
       {
-        "when": "$n > 0",
-        "call": "grow",
-        "args": {"n": "$n - 1"}
+        "case": "$n > 0",
+        "then": {"call": "grow", "args": {"n": "$n - 1"}}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

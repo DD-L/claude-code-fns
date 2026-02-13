@@ -68,7 +68,7 @@ def main():
         sys.exit(0)
     
     # 检查状态文件
-    state_file = STATES_DIR / f"{wt_session}.json"
+    state_file = STATES_DIR / wt_session / "state.json"
     log(f"Checking state file: {state_file}")
     
     if not state_file.exists():

@@ -6,17 +6,16 @@
   "tools": ["Read", "Write", "Edit", "Grep"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "need_test == true",
-        "call": "run_tests",
-        "args": {"target": "$target"}
+        "case": "need_test == true",
+        "then": {"call": "run_tests", "args": {"target": "$target"}}
       },
       {
-        "when": "need_test == false",
-        "type": "return"
+        "case": "need_test == false",
+        "then": {"type": "return"}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

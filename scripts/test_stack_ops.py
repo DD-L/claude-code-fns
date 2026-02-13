@@ -50,7 +50,7 @@ def run_check_chain(session: str) -> tuple:
 
 def load_state(session: str) -> dict:
     """直接读取状态文件"""
-    state_file = STATES_DIR / f"{session}.json"
+    state_file = STATES_DIR / session / "state.json"
     if state_file.exists():
         with open(state_file, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -58,13 +58,14 @@ def load_state(session: str) -> dict:
 
 
 def cleanup_test_sessions():
-    """清理所有测试 session"""
+    """清理所有测试 session 目录"""
     if STATES_DIR.exists():
-        for f in STATES_DIR.glob(f"{TEST_PREFIX}*.json"):
-            try:
-                f.unlink()
-            except:
-                pass
+        for d in STATES_DIR.glob(f"{TEST_PREFIX}*"):
+            if d.is_dir():
+                try:
+                    shutil.rmtree(d)
+                except:
+                    pass
 
 
 def test(name: str, condition: bool, msg: str = ""):

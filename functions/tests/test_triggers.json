@@ -1,0 +1,16 @@
+{
+  "name": "test_triggers",
+  "description": "测试 triggers (NFA 多分支) - 所有匹配的规则都执行",
+  "params": ["has_error", "needs_cleanup", "should_notify"],
+  "task": "Bash(echo \"[test_triggers] error=$has_error cleanup=$needs_cleanup notify=$should_notify\")",
+  "tools": ["Bash"],
+  "on_complete": {
+    "type": "triggers",
+    "rules": [
+      {"when": "$has_error == true", "do": {"call": "trigger_log_error", "args": {"msg": "error occurred"}}},
+      {"when": "$needs_cleanup == true", "do": {"call": "trigger_cleanup", "args": {"msg": "cleaning up"}}},
+      {"when": "$should_notify == true", "do": {"call": "trigger_notify", "args": {"msg": "sending notification"}}}
+    ],
+    "on_none": {"type": "return", "value": "no triggers matched"}
+  }
+}

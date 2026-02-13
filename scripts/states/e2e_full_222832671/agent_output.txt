@@ -1,0 +1,14 @@
+=== CC_FN_COMPLETE ===
+EXIT_CODE: 0
+
+[EVAL] 请根据以下情况选择分支：
+
+当前状态：{"input": "all tests passed"}
+
+分支选项：
+  0: "all tests passed" indicates success
+  1: "all tests passed" indicates failure
+  2: 默认（无匹配）
+
+请回答分支编号（整数）
+<<CC_FN_INPUT_NEEDED>>

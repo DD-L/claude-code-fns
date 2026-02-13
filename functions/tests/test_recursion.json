@@ -6,18 +6,16 @@
   "tools": ["Bash"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$n <= 0",
-        "type": "return",
-        "output": "base_case"
+        "case": "$n <= 0",
+        "then": {"type": "return", "value": "base_case"}
       },
       {
-        "when": "$n > 0",
-        "call": "test_recursion",
-        "args": {"n": "$n - 1"}
+        "case": "$n > 0",
+        "then": {"call": "test_recursion", "args": {"n": "$n - 1"}}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

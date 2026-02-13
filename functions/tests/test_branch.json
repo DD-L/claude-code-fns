@@ -6,22 +6,20 @@
   "tools": ["Bash"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$mode == 'A'",
-        "call": "branch_handler_a",
-        "args": {"from": "test_branch"}
+        "case": "$mode == 'A'",
+        "then": {"call": "branch_handler_a", "args": {"from": "test_branch"}}
       },
       {
-        "when": "$mode == 'B'",
-        "tail_call": "branch_handler_b",
-        "args": {"from": "test_branch"}
+        "case": "$mode == 'B'",
+        "then": {"tail_call": "branch_handler_b", "args": {"from": "test_branch"}}
       },
       {
-        "when": "$mode == 'C'",
-        "type": "return"
+        "case": "$mode == 'C'",
+        "then": {"type": "return"}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

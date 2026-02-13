@@ -184,7 +184,11 @@ if (-not (Test-Path $StatesDir)) {
 
 function Get-StateFile {
     param([string]$SessionId)
-    return Join-Path $StatesDir "$SessionId.json"
+    $sessionDir = Join-Path $StatesDir $SessionId
+    if (-not (Test-Path $sessionDir)) {
+        New-Item -ItemType Directory -Path $sessionDir -Force | Out-Null
+    }
+    return Join-Path $sessionDir "state.json"
 }
 
 function Load-State {
@@ -206,9 +210,9 @@ function Load-State {
         Write-Host "  3. Wrong terminal session"
         Write-Host ""
         Write-Host "Available sessions:"
-        $sessions = Get-ChildItem $StatesDir -Filter "*.json" -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne ".hook_debug.log" }
+        $sessions = Get-ChildItem $StatesDir -Directory -ErrorAction SilentlyContinue | Where-Object { -not $_.Name.StartsWith(".") }
         if ($sessions) {
-            $sessions | ForEach-Object { Write-Host "  - $($_.BaseName)" }
+            $sessions | ForEach-Object { Write-Host "  - $($_.Name)" }
         } else {
             Write-Host "  (none)"
         }

@@ -74,7 +74,7 @@ function Run-StackOps {
 
 function Load-State {
     param([string]$Session)
-    $file = Join-Path $StatesDir "$Session.json"
+    $file = Join-Path $StatesDir $Session "state.json"
     if (Test-Path $file) {
         return Get-Content $file -Raw -Encoding UTF8 | ConvertFrom-Json
     }
@@ -83,7 +83,7 @@ function Load-State {
 
 function Cleanup-TestSessions {
     if (Test-Path $StatesDir) {
-        Get-ChildItem $StatesDir -Filter "$TestPrefix*.json" | Remove-Item -Force -ErrorAction SilentlyContinue
+        Get-ChildItem $StatesDir -Directory -Filter "$TestPrefix*" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 

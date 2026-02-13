@@ -1,0 +1,8 @@
+{
+  "name": "trigger_notify",
+  "description": "触发器：发送通知",
+  "params": ["msg"],
+  "task": "Bash(echo \"[trigger_notify] $msg\")",
+  "tools": ["Bash"],
+  "on_complete": {"type": "return", "value": "notification_sent"}
+}

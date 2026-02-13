@@ -12,38 +12,38 @@
 ### 1. 调用 fn-controller
 
 ```
-使用 fn-controller subagent：
-  operation=recover
+Task(subagent_type='fn-controller', prompt='continue')
 ```
 
-### 2. 根据返回决定操作
+脚本自动从 `state.json` 恢复栈状态。
 
-| fn-controller 返回 | 主会话操作 |
-|-------------------|-----------|
-| `action: "nothing_to_recover"` | 输出 "没有需要恢复的调用链" |
-| `action: "execute_task"` | 执行 task，然后继续循环 |
-| `action: "ask_user"` | 询问用户选择，再调用 fn-controller |
-| `action: "complete"` | 输出结果，结束 |
+### 2. 根据输出决定操作
+
+| 输出 | 主会话操作 |
+|-----|-----------|
+| `[TASK]` | 执行 task，然后继续循环 |
+| `[COMPLETE]` | 输出结果，结束 |
+| `[ERROR]` | 输出错误信息 |
+| 栈为空 | 输出 "没有需要恢复的调用链" |
 
 ### 3. 继续执行循环
 
-收到 task → 执行 → 新建 fn-controller：
 ```
-使用 fn-controller subagent：
-  operation=continue, task_result=<执行结果>
+执行 task → fn-controller continue task_result=... → 循环直到 [COMPLETE]
 ```
-循环直到 complete
 
-## 错误状态处理
+## 手动错误恢复
 
-当 fn-controller 返回 `action: "ask_user"` 时，询问用户：
-1. retry - 重新执行栈顶函数
-2. skip - pop 当前函数继续
-3. clear - 清空栈结束
+如需手动干预栈状态：
+```bash
+# 查看栈状态
+python scripts/stack_ops.py <session> get
 
-```
-使用 fn-controller subagent：
-  operation=error_recovery, action=<用户选择>
+# 弹出栈顶
+python scripts/stack_ops.py <session> pop
+
+# 清空栈
+python scripts/stack_ops.py <session> clear
 ```
 
 $ARGUMENTS

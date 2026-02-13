@@ -90,8 +90,10 @@ def parse_kv_args(args: list) -> tuple:
 
 
 def get_state_file(session_id: str) -> Path:
-    """获取状态文件路径"""
-    return STATES_DIR / f"{session_id}.json"
+    """获取状态文件路径: scripts/states/<session_id>/state.json"""
+    session_dir = STATES_DIR / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    return session_dir / "state.json"
 
 
 def load_state(session_id: str, must_exist: bool = False) -> dict:
@@ -112,7 +114,7 @@ def load_state(session_id: str, must_exist: bool = False) -> dict:
         print("  3. Wrong terminal session")
         print("")
         print("Available sessions:")
-        sessions = [f.stem for f in STATES_DIR.glob("*.json") if f.stem != ".hook_debug"]
+        sessions = [d.name for d in STATES_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")]
         if sessions:
             for s in sessions:
                 print(f"  - {s}")

@@ -56,7 +56,7 @@ def run_with_headless(function_name: str, input_text: str, session: str = "defau
     """使用 headless 模式作为备用方案"""
     import subprocess
     
-    state_file = f"scripts/states/{session}.json"
+    state_file = f"scripts/states/{session}/state.json"
     max_iterations = 20
     
     # 确保目录存在

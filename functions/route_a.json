@@ -6,27 +6,24 @@
   "tools": ["Bash"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$n <= 0",
-        "call": "_return"
+        "case": "$n <= 0",
+        "then": {"type": "return"}
       },
       {
-        "when": "$n % 3 == 0",
-        "tail_call": "route_b",
-        "args": {"n": "$n - 1", "from": "A"}
+        "case": "$n % 3 == 0",
+        "then": {"tail_call": "route_b", "args": {"n": "$n - 1", "from": "A"}}
       },
       {
-        "when": "$n % 3 == 1",
-        "tail_call": "route_c",
-        "args": {"n": "$n - 1", "from": "A"}
+        "case": "$n % 3 == 1",
+        "then": {"tail_call": "route_c", "args": {"n": "$n - 1", "from": "A"}}
       },
       {
-        "when": "$n % 3 == 2",
-        "tail_call": "route_a",
-        "args": {"n": "$n - 2"}
+        "case": "$n % 3 == 2",
+        "then": {"tail_call": "route_a", "args": {"n": "$n - 2"}}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

@@ -12,7 +12,11 @@
       "Bash(ls \"C:/Users/LiNan/.claude/projects/G--gpt-cc-function\"/*.jsonl)",
       "Bash(ls -lt *.jsonl)",
       "Bash(bash scripts/wait_for_status.sh)",
-      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/interactive_test.py)"
+      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py *)",
+      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/interactive_test.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/fn_execute.py start tests/test_branch \"input=A\")",
+      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/fn_execute.py continue task_result='{\"\"tool\"\": \"\"Bash\"\", \"\"output\"\": \"\"[test_branch] mode=A\"\"}')",
+      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/fn_execute.py continue task_result='{\"\"tool\"\": \"\"Bash\"\", \"\"output\"\": \"\"[branch_handler_a] called from test_branch, will return\"\"}')"
     ]
   },
   "hooks": {

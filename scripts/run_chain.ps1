@@ -22,7 +22,7 @@ param(
     [string]$Session = "default"
 )
 
-$StateFile = "scripts/states/$Session.json"
+$StateFile = "scripts/states/$Session/state.json"
 $MaxIterations = 20
 
 function Get-State {

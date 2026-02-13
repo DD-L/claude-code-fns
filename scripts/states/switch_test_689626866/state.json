@@ -1,0 +1,26 @@
+{
+  "status": "running",
+  "stack": [
+    {
+      "function": "tests/test_branch",
+      "args": {
+        "mode": "A"
+      },
+      "step_index": 0,
+      "prev": null,
+      "has_prev": true
+    },
+    {
+      "function": "tests/branch_handler_a",
+      "args": {
+        "from": "test_branch"
+      },
+      "step_index": 0
+    }
+  ],
+  "output": null,
+  "controller": {
+    "resume_count": 3,
+    "max_resume_before_refresh": 5
+  }
+}

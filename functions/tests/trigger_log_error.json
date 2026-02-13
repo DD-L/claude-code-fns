@@ -1,0 +1,8 @@
+{
+  "name": "trigger_log_error",
+  "description": "触发器：记录错误",
+  "params": ["msg"],
+  "task": "Bash(echo \"[trigger_log_error] $msg\")",
+  "tools": ["Bash"],
+  "on_complete": {"type": "return", "value": "error_logged"}
+}

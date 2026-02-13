@@ -6,17 +6,16 @@
   "tools": ["Read", "Grep", "Glob"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "need_fix == true",
-        "call": "fix_issues",
-        "args": {"target": "$target", "issues": "$issues"}
+        "case": "need_fix == true",
+        "then": {"call": "fix_issues", "args": {"target": "$target", "issues": "$issues"}}
       },
       {
-        "when": "need_fix == false",
-        "type": "return"
+        "case": "need_fix == false",
+        "then": {"type": "return"}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

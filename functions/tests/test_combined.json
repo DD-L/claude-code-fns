@@ -6,28 +6,24 @@
   "tools": ["Bash"],
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$mode == 'sequence'",
-        "call": "test_sequence",
-        "args": {"input": "combined_$count"}
+        "case": "$mode == 'sequence'",
+        "then": {"call": "test_sequence", "args": {"input": "combined_$count"}}
       },
       {
-        "when": "$mode == 'loop'",
-        "call": "test_loop",
-        "args": {"count": 0, "max": "$count"}
+        "case": "$mode == 'loop'",
+        "then": {"call": "test_loop", "args": {"count": 0, "max": "$count"}}
       },
       {
-        "when": "$mode == 'recursion'",
-        "call": "test_recursion",
-        "args": {"n": "$count"}
+        "case": "$mode == 'recursion'",
+        "then": {"call": "test_recursion", "args": {"n": "$count"}}
       },
       {
-        "when": "$mode == 'tail'",
-        "tail_call": "test_tail_recursion",
-        "args": {"n": "$count"}
+        "case": "$mode == 'tail'",
+        "then": {"tail_call": "test_tail_recursion", "args": {"n": "$count"}}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }

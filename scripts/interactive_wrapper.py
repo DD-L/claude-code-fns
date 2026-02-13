@@ -132,21 +132,23 @@ def main():
 
                 proc.stdin.write(answer + '\n')
                 proc.stdin.flush()
-                input_file.unlink()  # 删除答案文件
+                # 删除答案文件（Windows 可能有文件锁，忽略错误）
+                try:
+                    input_file.unlink()
+                except PermissionError:
+                    pass  # Windows file lock, ignore
                 output_buffer = ''
 
     finally:
         if exit_code is None:
             exit_code = proc.wait()
 
-        # 写入完成标记到同一文件
+        # 写入完成标记和输出内容
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(f'=== CC_FN_COMPLETE ===\n')
             f.write(f'EXIT_CODE: {exit_code}\n')
-
-        # 可选：更新 state.json
-        state_file = session_dir / 'state.json'
-        # 这里可以写入完整的会话状态
+            if output_buffer:
+                f.write(f'\n{output_buffer}')
 
     sys.exit(exit_code)
 

@@ -52,7 +52,7 @@ if (-not $wtSession) {
     exit 0
 }
 
-$StateFile = "$StatesDir\$wtSession.json"
+$StateFile = "$StatesDir\$wtSession\state.json"
 Add-Content -Path $logFile -Value "[$timestamp] Checking state file: $StateFile" -Encoding UTF8
 
 if (-not (Test-Path $StateFile)) {

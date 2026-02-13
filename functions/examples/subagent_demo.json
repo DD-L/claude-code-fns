@@ -9,17 +9,16 @@
   },
   "on_complete": {
     "type": "switch",
-    "conditions": [
+    "cases": [
       {
-        "when": "$mode == 'quick'",
-        "call": "_return"
+        "case": "$mode == 'quick'",
+        "then": {"type": "return"}
       },
       {
-        "when": "$mode == 'chain'",
-        "call": "subagent_demo_step2",
-        "args": {"input": "$output"}
+        "case": "$mode == 'chain'",
+        "then": {"call": "subagent_demo_step2", "args": {"input": "$output"}}
       }
     ],
-    "default": "_return"
+    "default": {"type": "return"}
   }
 }
