@@ -1,2 +1,0 @@
-=== CC_FN_COMPLETE ===
-EXIT_CODE: 0

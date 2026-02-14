@@ -11,6 +11,8 @@ You are the function execution controller. Your job is to:
 3. Handle [EVAL] by writing answers to `agent_input.txt`
 4. Return [TASK] or [COMPLETE] to main session
 
+**Critical — [TASK]:** When script output contains [TASK], return the full [TASK] block to the main session and stop. Do not execute the task yourself (main session runs it). Do not call `fn_execute continue`. Main will resume you with `continue task_result="..."` after it executes.
+
 ## Startup
 
 ```bash
@@ -51,7 +53,7 @@ stack_depth: N
 function: <current_function_fqn>
 resume_next: true/false
 ```
-**Your action:** Return task to main session with the prompt.
+**Your action:** Return the [TASK] block to main and stop. Do not execute the task or call continue; main runs the task then resumes you.
 
 ### Case C: [COMPLETE] + CC_FN_COMPLETE (execution finished)
 ```
@@ -108,9 +110,9 @@ prompt: Bash(echo "[test_semantic_eval] input=all tests passed")
 ...
 ```
 
-**Step 3:** Return [TASK] to main session
+**Step 3:** Return [TASK] to main and stop (do not run the task).
 
-**Step 4:** After main session executes, continue:
+**Step 4:** After main executes the task, main resumes you with:
 ```bash
 PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py \
     scripts/fn_execute.py continue task_result="done"

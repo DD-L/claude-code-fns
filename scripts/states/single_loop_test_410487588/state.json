@@ -1,9 +1,0 @@
-{
-  "status": "idle",
-  "stack": [],
-  "output": null,
-  "controller": {
-    "resume_count": 4,
-    "max_resume_before_refresh": 5
-  }
-}

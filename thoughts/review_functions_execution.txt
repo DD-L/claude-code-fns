@@ -24,9 +24,9 @@
 - `fn-controller` subagent 定义在 `.claude/agents/*` 目录
 - hook 运行日志在 `scripts/states/.hook_debug.log` 中
 - 会话栈信息在 `scripts/states/$SessionID.json` 中
-- 必须完整阅读 C:\Users\LiNan\.claude\projects\G--gpt-cc-function\<claudecode_session_id>.jsonl 这里面是执行过程的完整信息
+- 必须完整阅读 %USERPROFILE%\.claude\projects\C--Users-admin-Desktop-del-projects-claude-code-fns\<claudecode_session_id>.jsonl 这里面是执行过程的完整信息
   - <claudecode_session_id> 与 $SessionID.json 中 $SessionID 不同，前者是 claudecode 的 session_id， 后者是 WT_SESSION
-  - 交互式命令 `/status` 可以看到当前 case 的  claudecode 的 session_id ：<claudecode_session_id> , 输入中一般都会提供，注意提取 它 去到  C:\Users\LiNan\.claude\projects\G--gpt-cc-function\ 路径查看对应 jsonl 文件
+  - 交互式命令 `/status` 可以看到当前 case 的  claudecode 的 session_id ：<claudecode_session_id> , 输入中一般都会提供，注意提取 它 去到  %USERPROFILE%\.claude\projects\C--Users-admin-Desktop-del-projects-claude-code-fns\ 路径查看对应 jsonl 文件
   - 总结里面的失败经验
 - 如果输入中包含自检信息，这些自检信息仅供参考，还是以你的分析结论为主
 

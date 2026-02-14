@@ -12,7 +12,7 @@
     │
     ├─→ fn-controller subagent (start <function> args...)
     │       ↓ 返回 [TASK]
-    ├─→ 执行 task (主会话或 subagent)
+    ├─→ 执行 task (主会话 main 或其它 subagent, 由 execute_in 字段决定)
     │       ↓ 执行完成
     └─→ fn-controller (continue task_result=...) → 循环直到 [COMPLETE]
 ```
@@ -42,11 +42,11 @@ resume_next: true
 
 ### 阶段 3: 执行 Task
 
-根据 `execute_in` 决定执行位置：
+主会话执行 [TASK] 中的 prompt（task 由 function 的 task 字段定义，可能是 Bash 或其他工具）。按 `execute_in` 决定执行位置：
 
 | execute_in | 执行方式 |
 |------------|---------|
-| `main` (默认) | 主会话直接执行 prompt |
+| `main` | 主会话直接执行 prompt |
 | `subagent` | 调用临时 subagent 执行 |
 | `subagent@<model>` | 指定模型执行 |
 
@@ -66,9 +66,9 @@ resume_next=false → Task(subagent_type='fn-controller', prompt='continue task_
 
 ## ❗关键规则
 
-1. **resume_next 混合方案**：根据返回值决定复用或新建 subagent
-2. **主会话职责**：解析参数 + 执行 task + 管理 agent_id
-3. **状态持久化**：通过 state.json 保持栈状态
+1. **主会话职责**：解析参数；监控 fn-controller 执行，必要时向 fn-controller 索取下一步 [TASK]；收到 [TASK] 后由主会话执行 prompt（按 execute_in）；管理 agent_id。
+2. **resume_next**：按返回值复用或新建 fn-controller subagent。
+3. **状态**：通过 state.json 持久化。
 
 ## 错误处理
 

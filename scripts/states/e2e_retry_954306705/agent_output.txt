@@ -1,7 +1,0 @@
-=== CC_FN_COMPLETE ===
-EXIT_CODE: 0
-
-
-[COMPLETE]
-result: success_branch
-resume_next: false

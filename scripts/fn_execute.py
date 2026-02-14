@@ -282,8 +282,8 @@ class Executor:
     # 主入口
     # ========================================================================
     
-    def handle_start(self, function: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        """处理 start 指令"""
+    def handle_start(self, function: str, args: Dict[str, Any], positional: Optional[List[str]] = None) -> Dict[str, Any]:
+        """处理 start 指令。positional 为函数名后的位置参数列表，将按函数定义中的 params 顺序映射为命名参数（命名参数优先）。"""
         # start 命令开始新的执行，清空旧状态
         self.state["stack"] = []
         self.state["status"] = "idle"
@@ -300,6 +300,15 @@ class Executor:
         fn_def = read_function(fqn)
         if not fn_def:
             return {"action": "error", "error": f"Function not found: {fqn}"}
+        
+        # 按函数声明的 params 将位置参数映射为命名参数（命名参数覆盖位置参数）
+        param_names = fn_def.get("params")
+        if isinstance(param_names, list) and positional:
+            base = {}
+            for i, val in enumerate(positional):
+                if i < len(param_names):
+                    base[param_names[i]] = val
+            args = {**base, **args}
         
         # 内置函数
         if fn_def.get("builtin"):
@@ -952,10 +961,10 @@ def format_output(result: Dict[str, Any], resume_next: bool = True) -> str:
 # 命令行入口
 # ============================================================================
 
-def parse_args(args: List[str]) -> Tuple[str, Dict[str, Any]]:
-    """解析命令行参数"""
+def parse_args(args: List[str]) -> Tuple[str, Dict[str, Any], List[str]]:
+    """解析命令行参数。返回 (cmd, params, positional)，其中 positional 为 start 时函数名之后的位置参数列表。"""
     if not args:
-        return "", {}
+        return "", {}, []
     
     cmd = args[0]
     params = {}
@@ -980,12 +989,13 @@ def parse_args(args: List[str]) -> Tuple[str, Dict[str, Any]]:
         else:
             remaining.append(arg)
     
-    # 第一个非 key=value 参数作为函数名（对于 start 命令）
+    # 第一个非 key=value 参数作为函数名（对于 start 命令），其余为位置参数
+    positional: List[str] = []
     if remaining and cmd == "start":
         params["_function"] = remaining[0]
-        remaining = remaining[1:]
+        positional = remaining[1:]
     
-    return cmd, params
+    return cmd, params, positional
 
 
 def main():
@@ -1002,7 +1012,7 @@ def main():
         print("  python interactive_wrapper.py fn_execute.py start <function> [args...]")
         sys.exit(1)
     
-    cmd, params = parse_args(sys.argv[1:])
+    cmd, params, positional = parse_args(sys.argv[1:])
     session_id = get_session_id()
     executor = Executor(session_id)
     
@@ -1011,7 +1021,7 @@ def main():
         if not function:
             print("[ERROR] Missing function name")
             sys.exit(1)
-        result = executor.handle_start(function, params)
+        result = executor.handle_start(function, params, positional=positional)
     
     elif cmd == "continue":
         task_result = params.get("task_result")

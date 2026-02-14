@@ -1,9 +1,0 @@
-{
-  "status": "idle",
-  "stack": [],
-  "output": "success_branch",
-  "controller": {
-    "resume_count": 2,
-    "max_resume_before_refresh": 5
-  }
-}

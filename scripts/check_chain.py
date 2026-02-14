@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """
 Stop Hook - Check if function chain needs to continue
-Uses WT_SESSION environment variable to identify the session
+Session ID is obtained by calling get_session_id.py (same as fn_execute / fn-controller).
 
 Exit codes:
   0: allow stop
   2 + stderr: block stop, stderr content is fed back to Claude
+
+Optional: --session=<id> or CC_FN_TEST_SESSION env to override (for testing only).
 """
 
 import os
 import sys
 import json
+import argparse
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -20,33 +24,59 @@ STATES_DIR = SCRIPT_DIR / "states"
 LOG_FILE = STATES_DIR / ".hook_debug.log"
 
 
+def get_session_id() -> str:
+    """Get session ID by calling get_session_id.py (same as fn_execute.py)."""
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_DIR / "get_session_id.py")],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return (result.stdout or "").strip()
+    return "default"
+
+
 def log(message: str):
     """写入调试日志"""
     try:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(LOG_FILE, 'a', encoding='utf-8') as f:
             f.write(f"[{timestamp}] {message}\n")
-    except:
+    except Exception:
         pass
+
+
+def parse_args():
+    """Parse --session= for testing (matches PS1 -TestSession)."""
+    p = argparse.ArgumentParser(description="Stop hook - check function chain")
+    p.add_argument("--session", "-s", metavar="ID", help="Override WT_SESSION (for testing)")
+    return p.parse_known_args()[0]
 
 
 def main():
+    args = parse_args()
+    # Session: --session or CC_FN_TEST_SESSION for testing; otherwise call get_session_id.py (same as fn-controller)
+    wt_session = args.session or os.environ.get("CC_FN_TEST_SESSION")
+    if not wt_session:
+        wt_session = get_session_id()
+
     # 检查 states 目录是否存在
     if not STATES_DIR.exists():
         sys.exit(0)
-    
-    log("Stop hook triggered (Python)")
-    
-    # 读取 stdin 输入
+
+    log("Stop hook triggered")
+
+    # Only read stdin when redirected (match PS1 [Console]::IsInputRedirected)
     input_json = ""
-    try:
-        input_json = sys.stdin.read()
-    except:
-        pass
-    
-    log(f"WT_SESSION: {os.environ.get('WT_SESSION', '')}")
+    if not sys.stdin.isatty():
+        try:
+            input_json = sys.stdin.read()
+        except Exception:
+            pass
+
+    log(f"session_id: {wt_session}")
     log(f"Input length: {len(input_json)}")
-    
+
     # 检查 stop_hook_active 标志
     stop_hook_active = False
     if input_json:
@@ -56,17 +86,16 @@ def main():
             log(f"Parsed stop_hook_active: {stop_hook_active}")
         except json.JSONDecodeError as e:
             log(f"JSON parse error: {e}")
-    
+
     if stop_hook_active:
         log("stop_hook_active=true, allowing stop")
         sys.exit(0)
-    
-    # 获取 WT_SESSION
-    wt_session = os.environ.get("WT_SESSION", "")
+
+    # Empty session: get_session_id.py returned nothing -> allow stop (same as PS1 no WT_SESSION)
     if not wt_session:
-        log("No WT_SESSION, allowing stop")
+        log("No session_id (get_session_id.py returned empty), allowing stop")
         sys.exit(0)
-    
+
     # 检查状态文件
     state_file = STATES_DIR / wt_session / "state.json"
     log(f"Checking state file: {state_file}")
@@ -129,16 +158,13 @@ def main():
             for i in range(start_idx, stack_len):
                 chain_parts.append(stack[i].get("function", "?"))
             msg += f"\n  Call chain: {' -> '.join(chain_parts)}"
-        
-        # 添加 status 信息
-        msg += f"\n  Status: {status}"
-        
+
         msg += "\n"
-        msg += "\n[ACTION REQUIRED] Continue function execution:"
+        msg += "\n[ACTION REQUIRED] Call fn-controller subagent:"
         msg += "\n"
-        msg += "\n  Option 1: Call fn-controller subagent with operation=continue"
-        msg += "\n  Option 2: Quick check with: scripts/stack_ops.ps1 -Op show"
-        msg += "\n  Option 3: Force clear with: scripts/stack_ops.ps1 -Op clear"
+        msg += "\n  operation=continue, task_result=<last task result>"
+        msg += "\n"
+        msg += "\n  (fn-controller will auto-obtain session_id)"
         log("Prompting for fn-controller continue")
         
         print(msg, file=sys.stderr)

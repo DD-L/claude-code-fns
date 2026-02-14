@@ -16,7 +16,9 @@
       "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/interactive_test.py)",
       "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/fn_execute.py start tests/test_branch \"input=A\")",
       "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/fn_execute.py continue task_result='{\"\"tool\"\": \"\"Bash\"\", \"\"output\"\": \"\"[test_branch] mode=A\"\"}')",
-      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/fn_execute.py continue task_result='{\"\"tool\"\": \"\"Bash\"\", \"\"output\"\": \"\"[branch_handler_a] called from test_branch, will return\"\"}')"
+      "Bash(PYTHONIOENCODING=utf-8 python -u scripts/interactive_wrapper.py scripts/fn_execute.py continue task_result='{\"\"tool\"\": \"\"Bash\"\", \"\"output\"\": \"\"[branch_handler_a] called from test_branch, will return\"\"}')",
+      "Bash(PYTHONIOENCODING=utf-8 python:*)",
+      "Bash(bash C:/Users/admin/Desktop/del/projects/claude-code-fns/scripts/wait_for_status.sh)"
     ]
   },
   "hooks": {
@@ -35,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File scripts/check_chain.ps1"
+            "command": "python scripts/check_chain.py"
           }
         ]
       }
